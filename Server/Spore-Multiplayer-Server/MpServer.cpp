@@ -654,11 +654,13 @@ namespace SporeMP
 
 		client.assetId = info.assetId;
 		client.assetSize = info.totalSize;
+		client.assetKey = info.key;
 		client.assetBuffer.clear();
 		client.assetBuffer.reserve(info.totalSize);
 		client.assetInProgress = true;
 
-		MP_LOG_DEBUG("Player %u is sending an avatar asset (%u bytes)", client.id, info.totalSize);
+		MP_LOG_DEBUG("Player %u is sending an avatar asset (%u bytes, key %08x)",
+			client.id, info.totalSize, info.key.instance);
 	}
 
 	void Server::HandleAssetChunk(Client& client, const uint8_t* payload, size_t size)
@@ -709,13 +711,28 @@ namespace SporeMP
 
 		StoreAsset(client);
 
+		// The key of the creation is now known: remember it in the player info so
+		// the other clients can resolve it, and tell them about the change.
+		if (ResKeyIsValid(client.assetKey) &&
+			(client.info.shipModel.instance != client.assetKey.instance ||
+			 client.info.shipModel.type != client.assetKey.type ||
+			 client.info.shipModel.group != client.assetKey.group))
+		{
+			client.info.shipModel = client.assetKey;
+
+			MsgPlayerUpdated updated;
+			std::memset(&updated, 0, sizeof(updated));
+			updated.player = client.info;
+			Broadcast(MsgType::PlayerUpdated, &updated, sizeof(updated), client.id);
+		}
+
 		// Forward the asset to the players that are already connected.
 		MsgAssetInfo info;
 		std::memset(&info, 0, sizeof(info));
 		info.assetId = client.assetId;
 		info.totalSize = client.assetSize;
 		info.ownerId = client.id;
-		info.key = client.info.shipModel;
+		info.key = client.assetKey;
 		Broadcast(MsgType::AssetInfo, &info, sizeof(info), client.id);
 
 		for (size_t offset = 0; offset < client.assetBuffer.size(); offset += kAssetChunkSize)
@@ -993,7 +1010,7 @@ namespace SporeMP
 		CachedAsset asset;
 		asset.assetId = client.assetId;
 		asset.ownerId = client.id;
-		asset.key = client.info.shipModel;
+		asset.key = client.assetKey;
 		asset.data = client.assetBuffer;
 		mAssets.push_back(std::move(asset));
 	}

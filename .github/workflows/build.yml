@@ -1,0 +1,93 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build mod, server and tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up MSVC (x86)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+
+      # The client links against SporeModAPIBase.lib (static) and SporeModAPI.lib
+      # (import library of the ModAPI DLL). Both are built from the SDK submodule,
+      # so the CI does not need the Launcher Kit installed.
+      - name: Build ModAPI static library
+        run: msbuild "Spore-ModAPI\Spore ModAPI\Spore ModAPI.vcxproj" /p:Configuration=Release /p:Platform=Win32 /v:minimal
+
+      - name: Build ModAPI DLL and import library
+        run: >
+          msbuild "Spore-ModAPI\Spore ModAPI\Spore ModAPI.vcxproj"
+          /p:Configuration="Release DLL" /p:Platform=Win32
+          /p:SDK_BUILD_VER=1 /p:EXECUTABLE_TYPE=10 /v:minimal
+
+      # The client project writes its output to $(SporeLauncherPath)mLibs and reads
+      # SporeModAPI.lib from $(SporeLauncherPath)coreLibs, so we provide a minimal
+      # stand-in folder instead of the real Launcher Kit.
+      - name: Prepare stand-in launcher folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "kit\coreLibs" | Out-Null
+          Copy-Item "Spore-ModAPI\dll\Release\SporeModAPI.lib" "kit\coreLibs\" -Force
+          Get-ChildItem "kit" -Recurse | Select-Object FullName
+
+      - name: Build client mod
+        shell: pwsh
+        run: |
+          $kit = Join-Path (Get-Location) "kit\"
+          msbuild "Client\Spore-Multiplayer-Client\Spore-Multiplayer-Client.vcxproj" `
+            /p:Configuration=Release /p:Platform=Win32 /p:SporeLauncherPath="$kit" /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build dedicated server
+        run: msbuild "Server\Spore-Multiplayer-Server\Spore-Multiplayer-Server.vcxproj" /p:Configuration=Release /p:Platform=Win32 /v:minimal
+
+      - name: Run server integration tests
+        shell: pwsh
+        run: |
+          .\Tools\test-server.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "artifacts" | Out-Null
+          Copy-Item "kit\mLibs\Spore-Multiplayer-Client.dll" "artifacts\" -Force
+          Copy-Item "Client\Spore-Multiplayer-Client\SporeMultiplayer.ini" "artifacts\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Server\bin\Release\Spore-Multiplayer-Server.exe" "artifacts\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Server\server.ini" "artifacts\" -Force
+          Get-ChildItem "artifacts" | Select-Object Name, Length
+
+      - name: Upload client mod
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-multiplayer-client
+          path: |
+            artifacts/Spore-Multiplayer-Client.dll
+            artifacts/SporeMultiplayer.ini
+          if-no-files-found: error
+
+      - name: Upload dedicated server
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-multiplayer-server
+          path: |
+            artifacts/Spore-Multiplayer-Server.exe
+            artifacts/server.ini
+          if-no-files-found: error

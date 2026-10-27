@@ -122,6 +122,22 @@ player a different name with `mp_name`.
 `Tools\fake-client.ps1 -Name Bob` connects a fake client that flies in circles, which is enough to
 check the avatars and the chat without a second game.
 
+To test the creation sharing without creating anything by hand, download a few real creations
+from the Sporepedia (the files are Model-in-Picture PNGs, exactly what the game uses):
+
+```
+python Tools\download-test-creations.py --count 3
+```
+
+Then make the fake client upload one of them:
+
+```
+powershell -File Tools\fake-client.ps1 -Name Bob -Asset refs\test-creations\creature_500262075795.png
+```
+
+The game should log `Imported the avatar creation of player N`, and the creation appears in the
+Sporepedia of the receiving player.
+
 > **Note:** Spore's `-devDirs` flag creates an isolated `UserData` folder, which is handy for
 > testing without touching your real creations. It also breaks some of the game's SPUI layouts, so
 > use it only for tests and never for a normal session.

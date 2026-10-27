@@ -215,6 +215,13 @@ namespace SporeMP
 		CopyString(hello.name, sizeof(hello.name), mLocalName.c_str());
 		hello.stage = Stage::kNone;
 
+		// If the avatar is already known (the player connected from an active
+		// stage), tell the server which creation we use.
+		if (ResKeyIsValid(mLocalAvatarKey))
+		{
+			hello.shipModel = mLocalAvatarKey;
+		}
+
 		if (!mNetwork.Connect(host, port, hello))
 		{
 			Notify("Could not start the connection");

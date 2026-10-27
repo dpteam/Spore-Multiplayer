@@ -18,7 +18,9 @@ param(
     [int]$Port = 7000,
     [double]$Radius = 200.0,
     [double]$Speed = 0.4,
-    [string]$Say = ''
+    [string]$Say = '',
+    [string]$Asset = '',
+    [int]$AssetKeyInstance = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -133,6 +135,51 @@ if ($Say -ne '') {
     Add-FixedString $chat $Say 160
     Send-Frame $stream 10 $chat.ToArray()
     Write-Host "  Sent chat: $Say" -ForegroundColor Magenta
+}
+
+# Upload a real creation PNG (Model-in-Picture) as if it was our avatar.
+if ($Asset -ne '') {
+    if (-not (Test-Path $Asset)) {
+        Write-Host "  Asset not found: $Asset" -ForegroundColor Red
+    }
+    else {
+        $assetBytes = [System.IO.File]::ReadAllBytes((Resolve-Path $Asset).Path)
+        $assetId = [uint32]($assetBytes.Length * 2654435761 % 4294967296)
+        if ($AssetKeyInstance -ne 0) { $assetId = [uint32]$AssetKeyInstance }
+
+        Write-Host "  Uploading asset $Asset ($($assetBytes.Length) bytes, id 0x$($assetId.ToString('X8')))" -ForegroundColor Cyan
+
+        $info = New-Object 'System.Collections.Generic.List[byte]'
+        Add-UInt32 $info $assetId
+        Add-UInt32 $info ([uint32]$assetBytes.Length)
+        Add-UInt32 $info 0            # owner, filled by the server
+        Add-UInt32 $info 0            # key.instance
+        Add-UInt32 $info 0            # key.type
+        Add-UInt32 $info 0            # key.group
+        Send-Frame $stream 15 $info.ToArray()
+
+        $chunkSize = 1024
+        for ($offset = 0; $offset -lt $assetBytes.Length; $offset += $chunkSize) {
+            $count = [Math]::Min($chunkSize, $assetBytes.Length - $offset)
+
+            $chunk = New-Object 'System.Collections.Generic.List[byte]'
+            Add-UInt32 $chunk $assetId
+            Add-UInt32 $chunk ([uint32]$offset)
+            Add-UInt16 $chunk ([uint16]$count)
+            Add-UInt16 $chunk 0
+            for ($i = 0; $i -lt $count; $i++) { $chunk.Add($assetBytes[$offset + $i]) }
+
+            Send-Frame $stream 16 $chunk.ToArray()
+        }
+
+        $done = New-Object 'System.Collections.Generic.List[byte]'
+        Add-UInt32 $done $assetId
+        $done.Add([byte]1)
+        $done.Add([byte]0)
+        $done.Add([byte]0)
+        $done.Add([byte]0)
+        Send-Frame $stream 17 $done.ToArray()
+    }
 }
 
 $stage = 5

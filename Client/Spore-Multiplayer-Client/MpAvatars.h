@@ -42,6 +42,9 @@ namespace SporeMP
 		{
 			Stage stage = Stage::kNone;
 			uint32_t systemId = 0;
+			/// Creation that was used to spawn the avatar; when the real creation
+			/// arrives (or changes) the avatar is respawned with it.
+			ResKey usedKey = { 0, 0, 0 };
 			eastl::intrusive_ptr<Simulator::cGameDataUFO> ufo;
 			eastl::intrusive_ptr<Simulator::cHerd> herd;
 			bool seen = false;

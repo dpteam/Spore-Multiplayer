@@ -76,7 +76,14 @@ namespace SporeMP
 
 			Slot& slot = GetOrCreateSlot(player.id);
 
-			if (!IsSlotValid(slot) || slot.stage != player.stage)
+			// The creation of the player may still be downloading, or may have
+			// changed; in both cases the avatar must be (re)spawned.
+			const ResKey resolvedKey = AvatarAssets::Get().ResolveKey(player.avatarKey);
+			const bool keyChanged = slot.usedKey.instance != resolvedKey.instance ||
+				slot.usedKey.type != resolvedKey.type ||
+				slot.usedKey.group != resolvedKey.group;
+
+			if (!IsSlotValid(slot) || slot.stage != player.stage || keyChanged)
 			{
 				DestroySlot(slot);
 
@@ -98,6 +105,7 @@ namespace SporeMP
 
 				slot.stage = player.stage;
 				slot.systemId = player.systemId;
+				slot.usedKey = resolvedKey;
 			}
 
 			if (player.stage == Stage::kSpace)
@@ -177,6 +185,7 @@ namespace SporeMP
 
 		slot.stage = Stage::kNone;
 		slot.systemId = 0;
+		slot.usedKey = ResKey{ 0, 0, 0 };
 		slot.seen = false;
 	}
 

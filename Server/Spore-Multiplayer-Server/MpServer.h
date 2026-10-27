@@ -87,6 +87,7 @@ namespace SporeMP
 			std::vector<uint8_t> assetBuffer;
 			uint32_t assetId = 0;
 			uint32_t assetSize = 0;
+			ResKey assetKey = { 0, 0, 0 };
 			bool assetInProgress = false;
 		};
 
