@@ -98,6 +98,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="MpAssets.h" />
     <ClInclude Include="MpAvatars.h" />
     <ClInclude Include="MpCheats.h" />
     <ClInclude Include="MpConfig.h" />
@@ -110,6 +111,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="MpAssets.cpp" />
     <ClCompile Include="MpAvatars.cpp" />
     <ClCompile Include="MpCheats.cpp" />
     <ClCompile Include="MpConfig.cpp" />

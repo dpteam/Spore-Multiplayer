@@ -8,6 +8,7 @@ The Spore mod (`Spore-Multiplayer-Client.dll`), loaded by the Spore ModAPI Launc
 | `MpNet.*` | Non-blocking TCP client with its own worker thread |
 | `MpSession.*` | Session state machine: handshake, player table, state sync, chat |
 | `MpAvatars.*` | Spawns/moves the visual copies of the other players (ships, creatures) |
+| `MpAssets.*` | Shares the exact creations as Model-in-Picture PNGs and imports them |
 | `MpOverlay.*` | On-screen overlay with the players, the ping and the chat |
 | `MpCheats.*` | The `mp_*` console commands |
 | `MpConfig.*` | Reads/writes `SporeMultiplayer.ini` |

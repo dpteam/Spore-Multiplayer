@@ -24,7 +24,8 @@ That keeps it compatible with mods, saves and the single player campaign.
 | Handshake, protocol versioning, player list | Done |
 | Player state sync (position + orientation, 15 Hz) | Done |
 | Remote avatars in the **Space** stage (ships) | Done |
-| Remote avatars in the **Creature** stage | Done |
+| Remote avatars in the **Creature** and **Tribe** stages | Done |
+| Exact creations shared between players (creation PNGs) | Done |
 | In-game chat relay | Done |
 | On-screen overlay (players, ping, chat) | Done |
 | Console commands (`mp_*`) | Done |
@@ -121,6 +122,10 @@ player a different name with `mp_name`.
 `Tools\fake-client.ps1 -Name Bob` connects a fake client that flies in circles, which is enough to
 check the avatars and the chat without a second game.
 
+> **Note:** Spore's `-devDirs` flag creates an isolated `UserData` folder, which is handy for
+> testing without touching your real creations. It also breaks some of the game's SPUI layouts, so
+> use it only for tests and never for a normal session.
+
 ---
 
 ## Running a session
@@ -195,7 +200,6 @@ You can also set `auto_connect=1` to join as soon as the game starts.
 ---
 
 ## How it works
-
 ```
 Spore (client A)  ──┐
 Spore (client B)  ──┼── TCP ──►  Spore-Multiplayer-Server.exe  ◄── TCP ──  Spore (client C)
@@ -214,9 +218,26 @@ Spore (client D)  ──┘
 - Chat, joins and leaves are relayed by the server and printed both in the overlay and in the
   Spore console.
 
+### Sharing the actual creations
+
+Spore saves every creation as a **Model-in-Picture PNG**: a normal image with the creation data
+hidden inside it. That makes it possible to share the *exact* creature or ship of a player:
+
+1. When a player joins, the client looks up the PNG of its own avatar (from the game's
+   key → path map, or by scanning the creations folder) and sends it to the server.
+2. The server caches it and forwards it to everyone, including players that join later.
+3. Each receiver writes the PNG to `%TEMP%\SporeMultiplayer\` and imports it with
+   `Thumbnail_cImportExport::ImportPNG()`, which adds the creation to the Sporepedia **only if it
+   is not there yet**.
+
+Nothing that already exists is replaced: your own creations and your save are never modified.
+If the transfer fails or is disabled, the mod falls back to the local ship/species, so the avatar
+is always visible.
+
 The protocol lives in `Shared/MpProtocol.h`: a 4-byte header (`uint16 type`, `uint16 size`)
 followed by a packed payload. Both sides are 32-bit little-endian, so the structures are sent in
-memory order.
+memory order. Creation files are sent in `AssetChunk` messages of 1 KB, with a maximum size of
+512 KB.
 
 ---
 

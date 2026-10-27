@@ -3,6 +3,7 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "MpSession.h"
+#include "MpAssets.h"
 #include "MpAvatars.h"
 #include "MpLog.h"
 
@@ -164,6 +165,8 @@ namespace SporeMP
 		mLocalName = mConfig.name;
 		mInitialized = true;
 
+		AvatarAssets::Get().Initialize(directory);
+
 		if (mConfig.autoConnect)
 		{
 			Connect(mConfig.host, mConfig.port);
@@ -173,6 +176,7 @@ namespace SporeMP
 	void Session::Dispose()
 	{
 		Avatars::Get().Clear();
+		AvatarAssets::Get().Dispose();
 		mNetwork.Disconnect();
 		mPlayers.clear();
 		mIncoming.clear();
@@ -312,6 +316,9 @@ namespace SporeMP
 			SendLocalState();
 		}
 
+		// Share the local avatar creation (the exact ship/creature PNG) once.
+		AvatarAssets::Get().UpdateLocalAsset(mNetwork, mLocalAvatarKey, mLocalStage);
+
 		// Smooth the movement of the other players.
 		for (RemotePlayer& player : mPlayers)
 		{
@@ -340,6 +347,13 @@ namespace SporeMP
 		mLocalSystemId = 0;
 		mLocalAvatarKey = ResKey{ 0, 0, 0 };
 
+		// The first time we get to a stage with a creature, use the species name
+		// as the player name (unless the player configured one explicitly).
+		if (!mNameResolved && IsCreatureStage(mLocalStage) && mConfig.name.empty())
+		{
+			ResolveNameFromSpecies();
+		}
+
 		if (mLocalStage == Stage::kSpace)
 		{
 			auto* starRecord = Simulator::GetActiveStarRecord();
@@ -365,7 +379,7 @@ namespace SporeMP
 				mLocalSystemId = planetRecord->GetID().internalValue;
 			}
 
-			if (mLocalStage == Stage::kCreature)
+			if (IsCreatureStage(mLocalStage))
 			{
 				auto* avatar = GameNounManager.GetAvatar();
 				if (avatar != nullptr && avatar->mpSpeciesProfile != nullptr)
@@ -381,8 +395,52 @@ namespace SporeMP
 		}
 	}
 
-	void Session::SendLocalState()
+	void Session::ResolveNameFromSpecies()
 	{
+		auto* avatar = GameNounManager.GetAvatar();
+		if (avatar == nullptr || avatar->mpSpeciesProfile == nullptr) return;
+
+		eastl::string16 speciesName;
+		avatar->mpSpeciesProfile->GetSpeciesName(speciesName);
+		if (speciesName.empty()) return;
+
+		// The protocol is ASCII only, so non ASCII names are transliterated by
+		// dropping the unknown characters.
+		std::string ascii;
+		ascii.reserve(speciesName.size());
+		for (size_t i = 0; i < speciesName.size(); ++i)
+		{
+			const char16_t c = speciesName[i];
+			if (c >= 0x20 && c < 0x7F)
+			{
+				ascii += static_cast<char>(c);
+			}
+			else if (c == ' ' || c == '-' || c == '\'')
+			{
+				ascii += static_cast<char>(c);
+			}
+		}
+
+		char sanitized[kMaxNameLength];
+		SanitizeText(ascii.c_str(), sanitized, sizeof(sanitized), "");
+		if (sanitized[0] == '\0') return;
+
+		mLocalName = sanitized;
+		mNameResolved = true;
+
+		MP_LOG_INFO("Using the species name as player name: '%s'", sanitized);
+
+		// Tell the server so the other players see the new name.
+		if (IsConnected())
+		{
+			MsgSetName message;
+			std::memset(&message, 0, sizeof(message));
+			CopyString(message.name, sizeof(message.name), sanitized);
+			mNetwork.Send(MsgType::SetName, &message, sizeof(message));
+		}
+	}
+
+	void Session::SendLocalState()	{
 		MsgLocalState state;
 		std::memset(&state, 0, sizeof(state));
 		state.stage = mLocalStage;
@@ -402,7 +460,7 @@ namespace SporeMP
 				hasPosition = true;
 			}
 		}
-		else if (mLocalStage == Stage::kCreature)
+		else if (IsCreatureStage(mLocalStage))
 		{
 			auto* avatar = GameNounManager.GetAvatar();
 			if (avatar != nullptr)
@@ -471,6 +529,15 @@ namespace SporeMP
 				break;
 			case MsgType::Kick:
 				HandleKick(data, size);
+				break;
+			case MsgType::AssetInfo:
+				AvatarAssets::Get().HandleInfo(data, size);
+				break;
+			case MsgType::AssetChunk:
+				AvatarAssets::Get().HandleChunk(data, size);
+				break;
+			case MsgType::AssetDone:
+				AvatarAssets::Get().HandleDone(data, size);
 				break;
 			default:
 				break;

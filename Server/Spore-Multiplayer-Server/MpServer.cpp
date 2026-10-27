@@ -376,6 +376,19 @@ namespace SporeMP
 			left.reason = reason;
 			Broadcast(MsgType::PlayerLeft, &left, sizeof(left), client.id);
 
+			// The avatar asset of a player that left is no longer needed.
+			for (auto it = mAssets.begin(); it != mAssets.end();)
+			{
+				if (it->ownerId == client.id)
+				{
+					it = mAssets.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+
 			MP_LOG_INFO("Player %u ('%s') disconnected (%s)", client.id, client.info.name, RejectReasonText(reason));
 		}
 		else if (!client.handshakeDone)
@@ -447,6 +460,15 @@ namespace SporeMP
 			break;
 		case MsgType::Ping:
 			HandlePing(client, payload, size);
+			break;
+		case MsgType::AssetInfo:
+			HandleAssetInfo(client, payload, size);
+			break;
+		case MsgType::AssetChunk:
+			HandleAssetChunk(client, payload, size);
+			break;
+		case MsgType::AssetDone:
+			HandleAssetDone(client, payload, size);
 			break;
 		default:
 			MP_LOG_DEBUG("Ignoring unexpected message type %u from %s", type, client.address.c_str());
@@ -521,6 +543,7 @@ namespace SporeMP
 		Send(client, MsgType::Welcome, &welcome, sizeof(welcome));
 
 		SendPlayerList(client);
+		SendCachedAssets(client);
 
 		MsgPlayerJoined joined;
 		std::memset(&joined, 0, sizeof(joined));
@@ -616,12 +639,120 @@ namespace SporeMP
 		Send(client, MsgType::Pong, &pong, sizeof(pong));
 	}
 
+	void Server::HandleAssetInfo(Client& client, const uint8_t* payload, size_t size)
+	{
+		if (size < sizeof(MsgAssetInfo)) return;
+
+		MsgAssetInfo info;
+		std::memcpy(&info, payload, sizeof(info));
+
+		if (info.totalSize == 0 || info.totalSize > kMaxAssetSize)
+		{
+			MP_LOG_WARN("Player %u sent an avatar asset with an invalid size (%u)", client.id, info.totalSize);
+			return;
+		}
+
+		client.assetId = info.assetId;
+		client.assetSize = info.totalSize;
+		client.assetBuffer.clear();
+		client.assetBuffer.reserve(info.totalSize);
+		client.assetInProgress = true;
+
+		MP_LOG_DEBUG("Player %u is sending an avatar asset (%u bytes)", client.id, info.totalSize);
+	}
+
+	void Server::HandleAssetChunk(Client& client, const uint8_t* payload, size_t size)
+	{
+		if (!client.assetInProgress) return;
+		if (size < sizeof(MsgAssetChunk)) return;
+
+		MsgAssetChunk chunk;
+		std::memcpy(&chunk, payload, sizeof(chunk));
+
+		const size_t dataSize = size - sizeof(MsgAssetChunk);
+		if (chunk.size != dataSize) return;
+		if (chunk.offset + dataSize > client.assetSize) return;
+		if (chunk.assetId != client.assetId) return;
+
+		if (client.assetBuffer.size() < chunk.offset + dataSize)
+		{
+			client.assetBuffer.resize(chunk.offset + dataSize);
+		}
+
+		std::memcpy(client.assetBuffer.data() + chunk.offset, payload + sizeof(MsgAssetChunk), dataSize);
+	}
+
+	void Server::HandleAssetDone(Client& client, const uint8_t* payload, size_t size)
+	{
+		if (!client.assetInProgress) return;
+		if (size < sizeof(MsgAssetDone)) return;
+
+		MsgAssetDone done;
+		std::memcpy(&done, payload, sizeof(done));
+
+		if (done.assetId != client.assetId)
+		{
+			client.assetInProgress = false;
+			client.assetBuffer.clear();
+			return;
+		}
+
+		client.assetInProgress = false;
+
+		if (!done.success || client.assetBuffer.size() != client.assetSize)
+		{
+			MP_LOG_WARN("Player %u failed to send its avatar asset (%zu/%u bytes)",
+				client.id, client.assetBuffer.size(), client.assetSize);
+			client.assetBuffer.clear();
+			return;
+		}
+
+		StoreAsset(client);
+
+		// Forward the asset to the players that are already connected.
+		MsgAssetInfo info;
+		std::memset(&info, 0, sizeof(info));
+		info.assetId = client.assetId;
+		info.totalSize = client.assetSize;
+		info.ownerId = client.id;
+		info.key = client.info.shipModel;
+		Broadcast(MsgType::AssetInfo, &info, sizeof(info), client.id);
+
+		for (size_t offset = 0; offset < client.assetBuffer.size(); offset += kAssetChunkSize)
+		{
+			const size_t count = (std::min)(kAssetChunkSize, client.assetBuffer.size() - offset);
+
+			MsgAssetChunk chunk;
+			std::memset(&chunk, 0, sizeof(chunk));
+			chunk.assetId = client.assetId;
+			chunk.offset = static_cast<uint32_t>(offset);
+			chunk.size = static_cast<uint16_t>(count);
+
+			std::vector<uint8_t> frame(sizeof(chunk) + count);
+			std::memcpy(frame.data(), &chunk, sizeof(chunk));
+			std::memcpy(frame.data() + sizeof(chunk), client.assetBuffer.data() + offset, count);
+
+			Broadcast(MsgType::AssetChunk, frame.data(), frame.size(), client.id);
+		}
+
+		MsgAssetDone finish;
+		std::memset(&finish, 0, sizeof(finish));
+		finish.assetId = client.assetId;
+		finish.success = 1;
+		Broadcast(MsgType::AssetDone, &finish, sizeof(finish), client.id);
+
+		MP_LOG_INFO("Player %u ('%s') shared its avatar asset (%u bytes)",
+			client.id, client.info.name, client.assetSize);
+
+		client.assetBuffer.clear();
+		client.assetBuffer.shrink_to_fit();
+	}
+
 	// ------------------------------------------------------------------------
 	// Session
 	// ------------------------------------------------------------------------
 
-	void Server::BroadcastStates()
-	{
+	void Server::BroadcastStates()	{
 		for (auto& receiver : mClients)
 		{
 			if (receiver->socket == kInvalidSocket || !receiver->handshakeDone) continue;
@@ -838,8 +969,76 @@ namespace SporeMP
 		Send(client, MsgType::PlayerList, payload.data(), PlayerListPayloadSize(header->count));
 	}
 
-	void Server::SendSystemChat(Client& client, const char* text)
+	Server::CachedAsset* Server::FindAsset(uint32_t assetId)
 	{
+		for (CachedAsset& asset : mAssets)
+		{
+			if (asset.assetId == assetId) return &asset;
+		}
+		return nullptr;
+	}
+
+	void Server::StoreAsset(Client& client)
+	{
+		// Replace the previous asset of this player, if any.
+		for (auto it = mAssets.begin(); it != mAssets.end(); ++it)
+		{
+			if (it->ownerId == client.id)
+			{
+				mAssets.erase(it);
+				break;
+			}
+		}
+
+		CachedAsset asset;
+		asset.assetId = client.assetId;
+		asset.ownerId = client.id;
+		asset.key = client.info.shipModel;
+		asset.data = client.assetBuffer;
+		mAssets.push_back(std::move(asset));
+	}
+
+	void Server::SendCachedAssets(Client& client)
+	{
+		for (const CachedAsset& asset : mAssets)
+		{
+			if (asset.ownerId == client.id) continue;
+			if (asset.data.empty()) continue;
+
+			MsgAssetInfo info;
+			std::memset(&info, 0, sizeof(info));
+			info.assetId = asset.assetId;
+			info.totalSize = static_cast<uint32_t>(asset.data.size());
+			info.ownerId = asset.ownerId;
+			info.key = asset.key;
+			Send(client, MsgType::AssetInfo, &info, sizeof(info));
+
+			for (size_t offset = 0; offset < asset.data.size(); offset += kAssetChunkSize)
+			{
+				const size_t count = (std::min)(kAssetChunkSize, asset.data.size() - offset);
+
+				MsgAssetChunk chunk;
+				std::memset(&chunk, 0, sizeof(chunk));
+				chunk.assetId = asset.assetId;
+				chunk.offset = static_cast<uint32_t>(offset);
+				chunk.size = static_cast<uint16_t>(count);
+
+				std::vector<uint8_t> frame(sizeof(chunk) + count);
+				std::memcpy(frame.data(), &chunk, sizeof(chunk));
+				std::memcpy(frame.data() + sizeof(chunk), asset.data.data() + offset, count);
+
+				Send(client, MsgType::AssetChunk, frame.data(), frame.size());
+			}
+
+			MsgAssetDone done;
+			std::memset(&done, 0, sizeof(done));
+			done.assetId = asset.assetId;
+			done.success = 1;
+			Send(client, MsgType::AssetDone, &done, sizeof(done));
+		}
+	}
+
+	void Server::SendSystemChat(Client& client, const char* text)	{
 		MsgChat chat;
 		std::memset(&chat, 0, sizeof(chat));
 		chat.senderId = 0;

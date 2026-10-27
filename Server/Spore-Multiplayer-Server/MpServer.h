@@ -82,6 +82,12 @@ namespace SporeMP
 			StateEntry state;
 			bool hasState = false;
 			bool stateChanged = false;
+
+			// Avatar asset being received from this client.
+			std::vector<uint8_t> assetBuffer;
+			uint32_t assetId = 0;
+			uint32_t assetSize = 0;
+			bool assetInProgress = false;
 		};
 
 		// --- networking ------------------------------------------------------
@@ -97,6 +103,9 @@ namespace SporeMP
 		void HandleChat(Client& client, const uint8_t* payload, size_t size);
 		void HandleSetName(Client& client, const uint8_t* payload, size_t size);
 		void HandlePing(Client& client, const uint8_t* payload, size_t size);
+		void HandleAssetInfo(Client& client, const uint8_t* payload, size_t size);
+		void HandleAssetChunk(Client& client, const uint8_t* payload, size_t size);
+		void HandleAssetDone(Client& client, const uint8_t* payload, size_t size);
 
 		// --- session ---------------------------------------------------------
 		void ProcessTicks();
@@ -108,7 +117,9 @@ namespace SporeMP
 		void Broadcast(MsgType type, const void* payload, size_t size, uint32_t exceptId = 0);
 		void BroadcastChat(uint32_t senderId, const char* text);
 
+		/// Sends the player list and the avatar assets that are already cached.
 		void SendPlayerList(Client& client);
+		void SendCachedAssets(Client& client);
 		void SendSystemChat(Client& client, const char* text);
 
 		/// Generates a name that is not used by any other client yet.
@@ -117,12 +128,26 @@ namespace SporeMP
 		bool IsNameInUse(const char* name, uint32_t exceptId) const;
 		bool IsNameValid(const char* name) const;
 
+		/// Avatar assets received from the players, so they can be sent to the
+		/// clients that join later without asking for them again.
+		struct CachedAsset
+		{
+			uint32_t assetId = 0;
+			uint32_t ownerId = 0;
+			ResKey key = { 0, 0, 0 };
+			std::vector<uint8_t> data;
+		};
+
+		CachedAsset* FindAsset(uint32_t assetId);
+		void StoreAsset(Client& client);
+
 		uint32_t NextPlayerId();
 		size_t ReadyClientCount() const;
 
 		ServerConfig mConfig;
 		uintptr_t mListenSocket = static_cast<uintptr_t>(~0);
 		std::vector<std::unique_ptr<Client>> mClients;
+		std::vector<CachedAsset> mAssets;
 		uint32_t mNextPlayerId = 1;
 		uint64_t mStartTime = 0;
 		bool mRunning = false;

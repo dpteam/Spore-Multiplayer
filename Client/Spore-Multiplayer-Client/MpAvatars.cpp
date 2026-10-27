@@ -3,6 +3,7 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "MpAvatars.h"
+#include "MpAssets.h"
 #include "MpLog.h"
 
 namespace SporeMP
@@ -84,7 +85,7 @@ namespace SporeMP
 				{
 					spawned = SpawnSpaceAvatar(slot, player);
 				}
-				else if (player.stage == Stage::kCreature)
+				else if (Session::IsCreatureStage(player.stage))
 				{
 					spawned = SpawnCreatureAvatar(slot, player);
 				}
@@ -103,7 +104,7 @@ namespace SporeMP
 			{
 				MoveSpaceAvatar(slot, player);
 			}
-			else if (player.stage == Stage::kCreature)
+			else if (Session::IsCreatureStage(player.stage))
 			{
 				MoveCreatureAvatar(slot, player);
 			}
@@ -184,9 +185,10 @@ namespace SporeMP
 		const uint32_t empireId = Simulator::GetPlayerEmpireID();
 
 		ResourceKey modelKey;
-		if (ResKeyIsValid(player.avatarKey))
+		ResKey resolvedKey = AvatarAssets::Get().ResolveKey(player.avatarKey);
+		if (ResKeyIsValid(resolvedKey))
 		{
-			modelKey = ResourceKey(player.avatarKey.instance, player.avatarKey.type, player.avatarKey.group);
+			modelKey = ResourceKey(resolvedKey.instance, resolvedKey.type, resolvedKey.group);
 		}
 		else
 		{
@@ -218,10 +220,11 @@ namespace SporeMP
 	bool Avatars::SpawnCreatureAvatar(Slot& slot, const RemotePlayer& player)
 	{
 		Simulator::cSpeciesProfile* profile = nullptr;
-		if (ResKeyIsValid(player.avatarKey))
+		ResKey resolvedKey = AvatarAssets::Get().ResolveKey(player.avatarKey);
+		if (ResKeyIsValid(resolvedKey))
 		{
 			profile = SpeciesManager.GetSpeciesProfile(
-				ResourceKey(player.avatarKey.instance, player.avatarKey.type, player.avatarKey.group));
+				ResourceKey(resolvedKey.instance, resolvedKey.type, resolvedKey.group));
 		}
 
 		if (profile == nullptr)

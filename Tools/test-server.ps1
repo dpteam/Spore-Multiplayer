@@ -322,14 +322,83 @@ try {
     Check ($reason -eq 1) "The client is rejected with ProtocolMismatch ($reason)"
 
     Write-Host ''
-    Write-Host 'Test 7: leaving the session'
+    Write-Host 'Test 7: avatar asset relay'
+
+    # Build a fake "creation PNG": the server must relay the bytes unchanged.
+    $assetSize = 3000
+    $asset = New-Object byte[] $assetSize
+    for ($i = 0; $i -lt $assetSize; $i++) { $asset[$i] = [byte](($i * 7) % 256) }
+    $assetId = [uint32]0x1234ABCD
+
+    $info = New-Object 'System.Collections.Generic.List[byte]'
+    Add-UInt32 $info $assetId
+    Add-UInt32 $info ([uint32]$assetSize)
+    Add-UInt32 $info $bobId
+    Add-UInt32 $info 0
+    Add-UInt32 $info 0
+    Add-UInt32 $info 0
+    Send-Frame $bob.Stream 15 $info.ToArray()
+
+    $chunkSize = 1024
+    for ($offset = 0; $offset -lt $assetSize; $offset += $chunkSize) {
+        $count = [Math]::Min($chunkSize, $assetSize - $offset)
+
+        $chunk = New-Object 'System.Collections.Generic.List[byte]'
+        Add-UInt32 $chunk $assetId
+        Add-UInt32 $chunk ([uint32]$offset)
+        Add-UInt16 $chunk ([uint16]$count)
+        Add-UInt16 $chunk 0
+        for ($i = 0; $i -lt $count; $i++) { $chunk.Add($asset[$offset + $i]) }
+
+        Send-Frame $bob.Stream 16 $chunk.ToArray()
+    }
+
+    $done = New-Object 'System.Collections.Generic.List[byte]'
+    Add-UInt32 $done $assetId
+    $done.Add([byte]1)
+    $done.Add([byte]0)
+    $done.Add([byte]0)
+    $done.Add([byte]0)
+    Send-Frame $bob.Stream 17 $done.ToArray()
+
+    $assetInfo = Read-Until $alice.Stream 15
+    $relayedId = [System.BitConverter]::ToUInt32($assetInfo.Payload, 0)
+    $relayedSize = [System.BitConverter]::ToUInt32($assetInfo.Payload, 4)
+    $relayedOwner = [System.BitConverter]::ToUInt32($assetInfo.Payload, 8)
+    Check ($relayedId -eq $assetId) 'Alice receives the asset announcement'
+    Check ($relayedSize -eq $assetSize) "The announced size is correct ($relayedSize)"
+    Check ($relayedOwner -eq $bobId) 'The asset is attributed to Bob'
+
+    $received = New-Object byte[] $assetSize
+    $receivedBytes = 0
+    for ($i = 0; $i -lt 20; $i++) {
+        $chunkFrame = Read-Until $alice.Stream 16
+        $offset = [System.BitConverter]::ToUInt32($chunkFrame.Payload, 4)
+        $count = [System.BitConverter]::ToUInt16($chunkFrame.Payload, 8)
+        [Array]::Copy($chunkFrame.Payload, 12, $received, $offset, $count)
+        $receivedBytes += $count
+        if ($receivedBytes -ge $assetSize) { break }
+    }
+    Check ($receivedBytes -eq $assetSize) "Alice receives the whole asset ($receivedBytes bytes)"
+
+    $identical = $true
+    for ($i = 0; $i -lt $assetSize; $i++) {
+        if ($received[$i] -ne $asset[$i]) { $identical = $false; break }
+    }
+    Check $identical 'The asset bytes are relayed unchanged'
+
+    $assetDone = Read-Until $alice.Stream 17
+    $doneId = [System.BitConverter]::ToUInt32($assetDone.Payload, 0)
+    Check ($doneId -eq $assetId) 'Alice receives the transfer completion'
+
+    Write-Host ''
+    Write-Host 'Test 8: leaving the session'
 
     $bob.Client.Close()
     $left = Read-Until $alice.Stream 6
     $leftId = [System.BitConverter]::ToUInt32($left.Payload, 0)
     Check ($leftId -eq $bobId) 'Alice is notified that Bob left'
-}
-catch {
+}catch {
     Write-Host ''
     Write-Host "Unexpected error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray

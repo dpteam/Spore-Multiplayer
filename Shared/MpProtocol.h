@@ -49,6 +49,12 @@ namespace SporeMP
 	/// Largest payload we are willing to accept. Anything bigger is a protocol error.
 	constexpr size_t kMaxPayloadSize = 2048;
 
+	/// Largest creation PNG we transfer. Creature PNGs are usually 30-150 KB.
+	constexpr size_t kMaxAssetSize = 512 * 1024;
+
+	/// Bytes of creation data sent in a single AssetChunk message.
+	constexpr size_t kAssetChunkSize = 1024;
+
 	// ------------------------------------------------------------------------
 	// Message types
 	// ------------------------------------------------------------------------
@@ -83,6 +89,12 @@ namespace SporeMP
 		SetName = 13,
 		/// Server -> client, the player was kicked and the connection will be closed.
 		Kick = 14,
+		/// Both directions, starts the transfer of a creation PNG (avatar asset).
+		AssetInfo = 15,
+		/// Both directions, a piece of a creation PNG.
+		AssetChunk = 16,
+		/// Both directions, the transfer of a creation PNG is finished.
+		AssetDone = 17,
 	};
 
 	/// Why a connection was refused/closed by the server.
@@ -273,6 +285,40 @@ namespace SporeMP
 		char message[kMaxReasonTextLength];
 	};
 
+	// ------------------------------------------------------------------------
+	// Avatar assets (creation PNGs)
+	//
+	// Spore stores creations as "Model-in-Picture" PNG files: a normal image with
+	// the creation data hidden inside it. Sending that file to the other players
+	// is enough for them to import the exact creature/ship that is being used,
+	// without replacing anything that already exists in their Sporepedia.
+	// ------------------------------------------------------------------------
+
+	struct MsgAssetInfo
+	{
+		/// Identifies the transfer; it is the hash of the resource key.
+		uint32_t assetId;
+		uint32_t totalSize;
+		/// Player that provides the asset.
+		uint32_t ownerId;
+		ResKey key;
+	};
+
+	struct MsgAssetChunk
+	{
+		uint32_t assetId;
+		uint32_t offset;
+		uint16_t size;
+		uint16_t reserved;
+	};
+
+	struct MsgAssetDone
+	{
+		uint32_t assetId;
+		uint8_t success;
+		uint8_t reserved[3];
+	};
+
 #pragma pack(pop)
 
 	// ------------------------------------------------------------------------
@@ -377,6 +423,19 @@ namespace SporeMP
 	inline bool ResKeyIsValid(const ResKey& key)
 	{
 		return key.instance != 0;
+	}
+
+	/// FNV-1a hash of a resource key, used as the asset transfer id.
+	inline uint32_t HashResKey(const ResKey& key)
+	{
+		uint32_t hash = 2166136261u;
+		const uint32_t values[3] = { key.instance, key.type, key.group };
+		for (int i = 0; i < 3; ++i)
+		{
+			hash ^= values[i];
+			hash *= 16777619u;
+		}
+		return hash;
 	}
 
 	/// Human readable name of a stage, used in the HUD and the console.

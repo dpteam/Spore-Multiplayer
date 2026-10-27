@@ -97,6 +97,13 @@ namespace SporeMP
 		/// Identifier of the star system / planet the local player is in, 0 if unknown.
 		uint32_t GetLocalSystemId() const { return mLocalSystemId; }
 
+		/// True for the stages where the player is represented by a creature
+		/// (Creature and Tribe).
+		static bool IsCreatureStage(Stage stage)
+		{
+			return stage == Stage::kCreature || stage == Stage::kTribe;
+		}
+
 		/// Returns the directory where the DLL and the configuration file live.
 		const std::string& GetDirectory() const { return mLogDirectory; }
 
@@ -104,6 +111,7 @@ namespace SporeMP
 		Session();
 
 		void UpdateLocalContext();
+		void ResolveNameFromSpecies();
 
 		void ProcessMessages();
 		void HandleWelcome(const uint8_t* data, size_t size);
@@ -139,6 +147,9 @@ namespace SporeMP
 		std::string mSessionName;
 		std::string mLastError;
 		int mLatency = 0;
+
+		/// True once the player name was resolved from the species name.
+		bool mNameResolved = false;
 
 		Stage mLocalStage = Stage::kNone;
 		uint32_t mLocalSystemId = 0;
