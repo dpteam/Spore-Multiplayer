@@ -396,3 +396,12 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Spore Multiplayer
+# Build outputs of the dedicated server (bin/obj at the repository root)
+bin/
+obj/
+
+# Build artifacts of the development tools
+Tools/mp-inject/*.exe
+Tools/mp-inject/*.obj

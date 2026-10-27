@@ -1,20 +1,103 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "stdafx.h"
 
+#include "MpAvatars.h"
+#include "MpCheats.h"
+#include "MpConfig.h"
+#include "MpLog.h"
+#include "MpOverlay.h"
+#include "MpSession.h"
+
+namespace
+{
+	/// Directory of the mod DLL, with a trailing backslash. It is resolved from the
+	/// module handle, because GetModuleFileName(nullptr) would return the path of
+	/// SporeApp.exe instead of the path of this DLL.
+	std::string g_moduleDirectory;
+
+	void ResolveModuleDirectory(HMODULE module)
+	{
+		char path[MAX_PATH] = { 0 };
+		const DWORD length = GetModuleFileNameA(module, path, MAX_PATH);
+		if (length == 0) return;
+
+		std::string fullPath(path, length);
+		const size_t separator = fullPath.find_last_of("\\/");
+		if (separator == std::string::npos) return;
+		g_moduleDirectory = fullPath.substr(0, separator + 1);
+	}
+
+	/// Called once every game frame by the App update message.
+	void Update()
+	{
+		static ULONGLONG lastTick = GetTickCount64();
+		static ULONGLONG lastHeartbeat = GetTickCount64();
+		static unsigned long long frameCount = 0;
+
+		const ULONGLONG now = GetTickCount64();
+		float deltaTime = static_cast<float>(now - lastTick) / 1000.0f;
+		lastTick = now;
+
+		// A paused or alt-tabbed game can produce huge deltas; clamp them so the
+		// interpolation does not jump.
+		if (deltaTime < 0.0f) deltaTime = 0.0f;
+		if (deltaTime > 0.5f) deltaTime = 0.5f;
+
+		// An exception must never escape into the game message loop: it would
+		// abort the dispatch of the update message and the mod would stop working.
+		try
+		{
+			SporeMP::Session::Get().Update(deltaTime);
+			SporeMP::Overlay::Get().Update(deltaTime);
+		}
+		catch (const std::exception& exception)
+		{
+			MP_LOG_ERROR("Exception in the update loop: %s", exception.what());
+		}
+		catch (...)
+		{
+			MP_LOG_ERROR("Unknown exception in the update loop");
+		}
+
+		++frameCount;
+
+		// Heartbeat: proves that the update message keeps arriving.
+		if (now - lastHeartbeat >= 15000)
+		{
+			lastHeartbeat = now;
+			MP_LOG_DEBUG("Heartbeat: %llu frames, %s", frameCount,
+				SporeMP::Session::Get().GetStatusText().c_str());
+		}
+	}
+}
+
 void Initialize()
 {
 	// This method is executed when the game starts, before the user interface is shown
-	// Here you can do things such as:
-	//  - Add new cheats
-	//  - Add new simulator classes
-	//  - Add new game modes
-	//  - Add new space tools
-	//  - Change materials
+
+	const std::string directory = SporeMP::ResolveDataDirectory(g_moduleDirectory);
+
+	SporeMP::InitializeLog(directory);
+	MP_LOG_INFO("Spore Multiplayer client starting (data directory: %s)", directory.c_str());
+
+	SporeMP::Session::Get().Initialize(directory);
+	SporeMP::Overlay::Get().Initialize();
+	SporeMP::AddCheats();
+
+	App::AddUpdateFunction(Update);
+
+	MP_LOG_INFO("Spore Multiplayer client ready (log: %s)", SporeMP::GetLogPath().c_str());
 }
 
 void Dispose()
 {
 	// This method is called when the game is closing
+
+	MP_LOG_INFO("Spore Multiplayer client stopping");
+
+	SporeMP::Overlay::Get().Dispose();
+	SporeMP::Session::Get().Dispose();
+	SporeMP::ShutdownLog();
 }
 
 void AttachDetours()
@@ -33,6 +116,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
+		ResolveModuleDirectory(hModule);
+
 		ModAPI::AddPostInitFunction(Initialize);
 		ModAPI::AddDisposeFunction(Dispose);
 
@@ -48,4 +133,3 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	}
 	return TRUE;
 }
-
