@@ -6,6 +6,27 @@
 #include "MpAssets.h"
 #include "MpLog.h"
 
+namespace
+{
+	/// Calls cSpatialObject::cSpatialObject_func7Ch, which the SDK documents as
+	/// "something related with screen position". It is an undocumented virtual, so
+	/// the call is guarded: if it ever faults, name tags are disabled instead of
+	/// crashing the game.
+	bool TryProjectToScreen(Simulator::cSpatialObject* object, Math::Point& dst)
+	{
+		__try
+		{
+			dst = Math::Point(0.0f, 0.0f);
+			object->cSpatialObject_func7Ch(true, dst);
+			return true;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			return false;
+		}
+	}
+}
+
 namespace SporeMP
 {
 	namespace
@@ -51,6 +72,19 @@ namespace SporeMP
 	void Avatars::Update(float deltaTime)
 	{
 		auto& session = Session::Get();
+
+		// One shot diagnostic: proves whether the screen projection works, which is
+		// what the name tags rely on. It only runs once per stage.
+		static Stage lastDiagnosedStage = Stage::kNone;
+		const Stage currentStage = session.GetLocalStage();
+		if (currentStage != lastDiagnosedStage)
+		{
+			lastDiagnosedStage = currentStage;
+			if (currentStage != Stage::kNone)
+			{
+				DebugProjectLocalAvatar();
+			}
+		}
 
 		if (!session.IsConnected() || !session.Config().showAvatars)
 		{
@@ -134,6 +168,66 @@ namespace SporeMP
 				++it;
 			}
 		}
+	}
+
+	bool Avatars::GetScreenPosition(uint32_t playerId, Math::Point& dst) const
+	{
+		auto it = mSlots.find(playerId);
+		if (it == mSlots.end()) return false;
+
+		const Slot& slot = it->second;
+
+		Simulator::cSpatialObject* object = nullptr;
+		if (slot.ufo != nullptr)
+		{
+			object = slot.ufo.get();
+		}
+		else if (slot.herd != nullptr && !slot.herd->mHerd.empty())
+		{
+			object = slot.herd->mHerd[0].get();
+		}
+
+		if (object == nullptr) return false;
+
+		if (!TryProjectToScreen(object, dst))
+		{
+			static bool reported = false;
+			if (!reported)
+			{
+				reported = true;
+				MP_LOG_WARN("The screen projection of the avatars is not available, name tags disabled");
+			}
+			return false;
+		}
+
+		return true;
+	}
+
+	void Avatars::DebugProjectLocalAvatar()
+	{
+		Simulator::cSpatialObject* object = nullptr;
+
+		if (Simulator::IsSpaceGame())
+		{
+			object = Simulator::GetPlayerUFO();
+		}
+		else if (Simulator::IsCreatureGame() || Simulator::IsTribeGame())
+		{
+			object = GameNounManager.GetAvatar();
+		}
+
+		if (object == nullptr)
+		{
+			MP_LOG_INFO("Projection test: no local avatar in this stage");
+			return;
+		}
+
+		Math::Point position(0.0f, 0.0f);
+		const bool ok = TryProjectToScreen(object, position);
+
+		MP_LOG_INFO("Projection test: ok=%s position=(%.1f, %.1f) objectPos=(%.1f, %.1f, %.1f)",
+			ok ? "true" : "false", position.x, position.y,
+			object->mPosition.x, object->mPosition.y, object->mPosition.z);
 	}
 
 	void Avatars::Clear()

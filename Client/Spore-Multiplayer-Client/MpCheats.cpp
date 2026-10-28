@@ -69,6 +69,7 @@ namespace SporeMP
 			Print("  mp_list                  - list the players in the session");
 			Print("  mp_hud [on|off]          - show or hide the overlay");
 			Print("  mp_avatars [on|off]      - show or hide the other players in the world");
+			Print("  mp_tags [on|off]         - show or hide the names above the avatars");
 			Print("  mp_reload                - reload SporeMultiplayer.ini");
 			Print("  mp_help                  - this list");
 		}
@@ -291,8 +292,38 @@ namespace SporeMP
 			}
 		};
 
-		class ReloadCheat : public ArgScript::ICommand
+		class TagsCheat : public ArgScript::ICommand
 		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				Session& session = Session::Get();
+
+				bool enabled = !session.Config().nameTags;
+				if (line.GetArgumentsCount() >= 2)
+				{
+					if (!ParseOnOff(line.GetArgumentAt(1), enabled))
+					{
+						Print("Usage: mp_tags [on|off]");
+						return;
+					}
+				}
+
+				session.Config().nameTags = enabled;
+				Overlay::Get().MarkDirty();
+				Print(enabled ? "Name tags enabled" : "Name tags disabled");
+
+				// Also verify that the projection works in the current stage.
+				Avatars::DebugProjectLocalAvatar();
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Shows or hides the names above the other players. Usage: mp_tags [on|off]";
+			}
+		};
+
+		class ReloadCheat : public ArgScript::ICommand		{
 		public:
 			void ParseLine(const ArgScript::Line& line) override
 			{
@@ -354,6 +385,7 @@ namespace SporeMP
 		manager->AddCheat("mp_list", new ListCheat());
 		manager->AddCheat("mp_hud", new HudCheat());
 		manager->AddCheat("mp_avatars", new AvatarsCheat());
+		manager->AddCheat("mp_tags", new TagsCheat());
 		manager->AddCheat("mp_reload", new ReloadCheat());
 		manager->AddCheat("mp_help", new HelpCheat());
 

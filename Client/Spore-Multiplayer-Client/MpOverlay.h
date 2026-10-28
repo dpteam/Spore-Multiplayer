@@ -1,11 +1,13 @@
 /****************************************************************************
 * Spore Multiplayer
 *
-* Lightweight on screen overlay: the connection status, the list of players in
-* the session and the last chat lines.
+* On screen overlay: the connection status, the list of players, the chat and
+* the name tags above the remote avatars.
 *
-* The overlay is a regular UTFWin window with a custom drawable, so it is drawn
-* by the game itself and does not need DirectX access.
+* The overlay is a single full screen UTFWin window with a custom drawable, so
+* the game itself renders it (no DirectX access needed). Everything is drawn in
+* absolute screen coordinates: the HUD block at the configured position and the
+* name tags at the projected position of each avatar.
 *
 * Chat is typed in the Spore console (Ctrl+Shift+C) with the `mp_say` cheat,
 * which means we do not have to implement text input.
@@ -18,24 +20,36 @@
 
 namespace SporeMP
 {
-	/// Draws the text of the overlay. Using a custom drawable means the text is
-	/// rendered with the same font system as the rest of the game.
+	/// A text drawn at an absolute screen position (used for the name tags).
+	struct ScreenLabel
+	{
+		float x = 0.0f;
+		float y = 0.0f;
+		eastl::string16 text;
+	};
+
+	/// Draws the HUD block and the name tags. Using a custom drawable means the
+	/// text is rendered with the same font system as the rest of the game.
 	class OverlayDrawable : public UTFWin::DefaultDrawable
 	{
 	public:
 		static const uint32_t TYPE = 0x8F3A21C4;
 
-		void SetContent(const std::vector<eastl::string16>& lines, float lineHeight,
-			Math::Color textColor, Math::Color backgroundColor);
+		void SetContent(const std::vector<eastl::string16>& lines, const Math::Rectangle& hudArea,
+			float lineHeight, Math::Color textColor, Math::Color backgroundColor,
+			const std::vector<ScreenLabel>& labels, Math::Color labelColor);
 
 		void* Cast(uint32_t type) const override;
 		void Paint(UTFWin::UIRenderer* pRenderer, const Math::Rectangle& area, const UTFWin::RenderParams& params) override;
 
 	private:
 		std::vector<eastl::string16> mLines;
+		std::vector<ScreenLabel> mLabels;
+		Math::Rectangle mHudArea;
 		float mLineHeight = 16.0f;
 		Math::Color mTextColor;
 		Math::Color mBackgroundColor;
+		Math::Color mLabelColor;
 	};
 
 	class Overlay

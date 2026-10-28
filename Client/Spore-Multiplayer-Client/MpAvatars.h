@@ -35,6 +35,14 @@ namespace SporeMP
 		/// Number of avatars currently spawned, for the HUD and the status command.
 		int GetActiveCount() const { return static_cast<int>(mSlots.size()); }
 
+		/// Projects the avatar of a player to screen coordinates.
+		/// @returns false if the player has no avatar or it is off screen.
+		bool GetScreenPosition(uint32_t playerId, Math::Point& dst) const;
+
+		/// Development helper: projects the local avatar to the screen and logs the
+		/// result, so the projection can be verified in any stage.
+		static void DebugProjectLocalAvatar();
+
 	private:
 		Avatars();
 

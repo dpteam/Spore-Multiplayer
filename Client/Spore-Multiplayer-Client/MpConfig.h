@@ -43,6 +43,7 @@ namespace SporeMP
 		int sendRate = 15;
 		bool showAvatars = true;
 		bool interpolation = true;
+		bool nameTags = true;
 	};
 
 	/// Loads the configuration from the given file. Missing values keep their defaults.

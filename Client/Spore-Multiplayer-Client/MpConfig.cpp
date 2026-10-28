@@ -101,6 +101,7 @@ namespace SporeMP
 			else if (key == "send_rate" && ToInt(value, number) && number >= 1 && number <= 60) config.sendRate = number;
 			else if (key == "show_avatars") config.showAvatars = ToBool(value);
 			else if (key == "interpolation") config.interpolation = ToBool(value);
+			else if (key == "name_tags") config.nameTags = ToBool(value);
 		}
 
 		return true;
@@ -134,7 +135,9 @@ namespace SporeMP
 			"; Show the other players as ships/creatures in the world.\n"
 			"show_avatars=" << (config.showAvatars ? 1 : 0) << "\n"
 			"; Smooth the movement of the other players.\n"
-			"interpolation=" << (config.interpolation ? 1 : 0) << "\n";
+			"interpolation=" << (config.interpolation ? 1 : 0) << "\n"
+			"; Draw the player names above the remote avatars.\n"
+			"name_tags=" << (config.nameTags ? 1 : 0) << "\n";
 
 		return true;
 	}
