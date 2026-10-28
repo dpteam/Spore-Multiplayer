@@ -45,6 +45,7 @@ Client/Spore-Multiplayer-Client/   The mod DLL (Spore ModAPI)
 Server/Spore-Multiplayer-Server/   The dedicated server (plain Win32 console app)
 Server/Spore-Multiplayer-Master/   The master server (HTTP + JSON API)
 Server/Spore-Multiplayer-Relay/    The relay server (NAT traversal)
+Server/Spore-Multiplayer-Launcher/ The launcher window (WebView2 + local HTTP API)
 Shared/MpProtocol.h                The game wire protocol, used by both sides
 Shared/MpMasterProtocol.h          The master HTTP/JSON protocol
 Shared/MpRelayProtocol.h           The relay handshake

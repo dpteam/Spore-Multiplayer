@@ -12,16 +12,9 @@ Ideas and planned work for Spore Multiplayer, roughly ordered by priority.
 - Hosting from the game (`mp_host`)
 - Master server with an HTTP/JSON API and registration/heartbeats
 - Relay server (port 17402) for NAT/CGNAT players without port forwarding
+- Launcher window (WebView2, with a browser fallback) and its server list
 - In-game console window that mirrors the log
 - GitHub Actions build + integration tests
-
-## Short term
-
-### Launcher / WebUI
-A small launcher that lists the servers from the master API and starts the game
-with the right arguments. Layout ideas from
-[DPTDOOM](https://github.com/dpteam/DPTDOOM). Because the master speaks plain
-HTTP + JSON, a web page can show the same list.
 
 ## Medium term
 
