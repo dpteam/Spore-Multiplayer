@@ -121,6 +121,17 @@ namespace SporeMP
 
 		StartDiscovery();
 
+		// Announce the session on the master, if one was configured.
+		if (!mConfig.masterUrl.empty())
+		{
+			mRegistration.reset(new MasterRegistration());
+			if (!mRegistration->Start(mConfig.masterUrl, mConfig.sessionName,
+				mConfig.port, mConfig.maxPlayers, &mPlayerCount))
+			{
+				mRegistration.reset();
+			}
+		}
+
 		MP_LOG_INFO("%s server listening on %s:%d", kProtocolName, mConfig.bindAddress.c_str(), mConfig.port);
 		MP_LOG_INFO("Session '%s', max %d players, %d ticks/s, protocol v%u",
 			mConfig.sessionName.c_str(), mConfig.maxPlayers, mConfig.tickRate, kProtocolVersion);
@@ -212,6 +223,9 @@ namespace SporeMP
 			CheckTimeouts();
 			ProcessCommands();
 			RemoveClosedClients();
+
+			// Publish the player count to the master registration thread.
+			mPlayerCount.store(static_cast<int>(ReadyClientCount()));
 		}
 
 		// Graceful shutdown: tell everybody why the connection is going away.
@@ -235,6 +249,13 @@ namespace SporeMP
 		{
 			closesocket(ToSocket(mDiscoverySocket));
 			mDiscoverySocket = kInvalidSocket;
+		}
+
+		// Unregister from the master before leaving.
+		if (mRegistration != nullptr)
+		{
+			mRegistration->Stop();
+			mRegistration.reset();
 		}
 
 		mRunning = false;

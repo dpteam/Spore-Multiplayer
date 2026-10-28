@@ -10,6 +10,7 @@
 #include "MpDiscovery.h"
 #include "MpHost.h"
 #include "MpLog.h"
+#include "MpMaster.h"
 #include "MpOverlay.h"
 #include "MpSession.h"
 
@@ -70,6 +71,7 @@ namespace SporeMP
 			Print("Spore Multiplayer commands:");
 			Print("  mp_host [port] [name]    - start a session and join it");
 			Print("  mp_servers               - list the sessions on the local network");
+			Print("  mp_internet              - list the sessions on the master server");
 			Print("  mp_join [number]         - join a session from that list");
 			Print("  mp_connect [host] [port] - connect to a server by address");
 			Print("  mp_disconnect            - leave the session");
@@ -172,7 +174,7 @@ namespace SporeMP
 				if (!customName.empty()) name = customName;
 
 				std::string error;
-				if (!host.StartServer(port, name, error))
+				if (!host.StartServer(port, name, session.Config().masterUrl, error))
 				{
 					Print("Could not host: " + error);
 					return;
@@ -260,6 +262,54 @@ namespace SporeMP
 			const char* GetDescription(ArgScript::DescriptionMode mode) const override
 			{
 				return "Joins a session found on the local network. Usage: mp_join [number]";
+			}
+		};
+
+		/// Lists the sessions registered on the master server.
+		class InternetCheat : public ArgScript::ICommand
+		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				const std::string masterUrl = Session::Get().Config().masterUrl;
+				if (masterUrl.empty())
+				{
+					Print("No master server configured, set master= in SporeMultiplayer.ini");
+					return;
+				}
+
+				Print("Querying " + masterUrl + "...");
+
+				std::vector<PublicSession> sessions;
+				std::string error;
+				if (!MasterQuery::Fetch(masterUrl, sessions, error))
+				{
+					Print("Could not reach the master: " + error);
+					return;
+				}
+
+				if (sessions.empty())
+				{
+					Print("No public sessions online right now");
+					return;
+				}
+
+				Print("Public sessions (" + std::to_string(sessions.size()) + "):");
+				for (size_t i = 0; i < sessions.size(); ++i)
+				{
+					const PublicSession& session = sessions[i];
+
+					Print("  " + std::to_string(i + 1) + ") " + session.name +
+						"  " + session.host + ":" + std::to_string(session.port) +
+						"  (" + std::to_string(session.players) + "/" + std::to_string(session.maxPlayers) + ")");
+				}
+
+				Print("Use mp_connect <host> <port> to join one");
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Lists the sessions registered on the master server.";
 			}
 		};
 
@@ -520,6 +570,7 @@ namespace SporeMP
 		manager->AddCheat("mp_connect", new ConnectCheat());
 		manager->AddCheat("mp_host", new HostCheat());
 		manager->AddCheat("mp_servers", new ServersCheat());
+		manager->AddCheat("mp_internet", new InternetCheat());
 		manager->AddCheat("mp_join", new JoinCheat());
 		manager->AddCheat("mp_disconnect", new DisconnectCheat());
 		manager->AddCheat("mp_name", new NameCheat());

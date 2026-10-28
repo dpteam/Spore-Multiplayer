@@ -95,6 +95,7 @@ namespace SporeMP
 			else if (key == "auto_connect") config.autoConnect = ToBool(value);
 			else if (key == "session_name") config.sessionName = value;
 			else if (key == "server_exe") config.serverExe = value;
+			else if (key == "master" || key == "master_url") config.masterUrl = value;
 			else if (key == "hud") config.hud = ToBool(value);
 			else if (key == "console") config.console = ToBool(value);
 			else if (key == "hud_x" && ToFloat(value, decimal)) config.hudX = decimal;
@@ -128,6 +129,8 @@ namespace SporeMP
 			"session_name=" << config.sessionName << "\n"
 			"; Path of Spore-Multiplayer-Server.exe. Empty means \"look next to the mod\".\n"
 			"server_exe=" << config.serverExe << "\n"
+			"; Master server used by mp_internet and by the sessions started with mp_host.\n"
+			"master=" << config.masterUrl << "\n"
 			"\n"
 			"[display]\n"
 			"; Show the multiplayer overlay (players, chat, ping).\n"

@@ -43,8 +43,15 @@ That keeps it compatible with mods, saves and the single player campaign.
 ```
 Client/Spore-Multiplayer-Client/   The mod DLL (Spore ModAPI)
 Server/Spore-Multiplayer-Server/   The dedicated server (plain Win32 console app)
-Shared/MpProtocol.h                The wire protocol, used by both sides
+Server/Spore-Multiplayer-Master/   The master server (HTTP + JSON API)
+Shared/MpProtocol.h                The game wire protocol, used by both sides
+Shared/MpMasterProtocol.h          The master HTTP/JSON protocol
 Tools/test-server.ps1              Integration test: fake clients against the real server
+Tools/test-master.ps1              Integration test for the master server
+Tools/test-discovery.ps1           Integration test for the LAN discovery
+Tools/fake-client.ps1              A fake client that joins and flies around
+Tools/download-test-creations.py   Fetches real creations from the Sporepedia
+Tools/send-console-command.ps1     Sends a command to the mod console
 Tools/make-icon.ps1                Regenerates refs/ICON.ico from refs/ICON.png
 refs/                              Icon and other reference assets
 Spore-ModAPI/                      Submodule with the SDK
@@ -157,9 +164,42 @@ Spore-Multiplayer-Server.exe --name "My Co-op" --port 7000
 Or edit `server.ini` next to the executable and just run it. Options can also be given on the
 command line; the command line always wins over the ini file.
 
+To make the session public, register it on a master server:
+
+```
+Spore-Multiplayer-Server.exe --name "My Co-op" --port 7000 --master play.dartpower.xyz:17401
+```
+
+The server then keeps its entry alive with heartbeats and removes it on exit.
+
 Console commands: `help`, `list`, `status`, `say <text>`, `kick <id> [reason]`, `stop`.
 
 If the server is reachable from the internet, forward the TCP port.
+
+### Master server
+
+The master keeps the public list of sessions and speaks plain HTTP + JSON, so the mod, a
+launcher or a web page can all read it:
+
+```
+Spore-Multiplayer-Master.exe --port 17401
+```
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/v1/servers` | List of public sessions |
+| `GET /api/v1/health` | Health check and uptime |
+| `POST /api/v1/register` | Register a session, returns a token |
+| `POST /api/v1/heartbeat` | Keep a session alive (the server does this automatically) |
+| `POST /api/v1/unregister` | Remove a session |
+
+```bash
+curl https://play.dartpower.xyz:17401/api/v1/servers
+```
+
+The public address of a session is taken from the connection, so the game server only has to
+reach the master — no extra configuration. Sessions that stop sending heartbeats are dropped
+after `timeout` seconds.
 
 ### 2. Configure the client
 
@@ -187,7 +227,11 @@ interpolation=1
 
 ### 3. Play
 
-Open the Spore console with **Ctrl + Shift + C**:
+The easiest way: type `mp_host` in the console window (or in the Spore console, Ctrl+Shift+C).
+The mod starts the dedicated server, registers it on the master and joins it. Other players run
+`mp_servers` for the local network or `mp_internet` for the public list, then `mp_join 1`.
+
+To join a specific server by address:
 
 ```
 mp_connect 192.168.1.10 7000
@@ -203,6 +247,10 @@ You can also set `auto_connect=1` to join as soon as the game starts.
 | Command | Description |
 |---|---|
 | `mp_connect [host] [port]` | Connect to a server (defaults come from the ini file) |
+| `mp_host [port] [name]` | Start a session and join it |
+| `mp_servers` | List the sessions on the local network |
+| `mp_internet` | List the sessions registered on the master server |
+| `mp_join [number]` | Join a session from the `mp_servers` list |
 | `mp_disconnect` | Leave the session |
 | `mp_name <name>` | Change the name shown to the other players |
 | `mp_say <text>` | Send a chat message |

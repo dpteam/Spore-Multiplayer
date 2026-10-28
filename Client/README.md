@@ -13,6 +13,10 @@ The Spore mod (`Spore-Multiplayer-Client.dll`), loaded by the Spore ModAPI Launc
 | `MpCheats.*` | The `mp_*` console commands |
 | `MpConfig.*` | Reads/writes `SporeMultiplayer.ini` |
 | `MpLog.*` | Log file (`SporeMultiplayer.log`) |
+| `MpConsole.*` | Console window that mirrors the log and accepts commands |
+| `MpDiscovery.*` | Finds sessions on the local network (UDP beacons) |
+| `MpHost.*` | Starts the dedicated server from inside the game |
+| `MpMaster.*` | Queries the master server for the public session list |
 
 Build it with the `Spore-Multiplayer-Client` project in the solution. The DLL is copied to the
 `mLibs` folder of the ModAPI Launcher Kit, which is where the launcher picks mods from.

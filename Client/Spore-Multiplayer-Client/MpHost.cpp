@@ -70,7 +70,8 @@ namespace SporeMP
 		return false;
 	}
 
-	bool Host::StartServer(uint16_t port, const std::string& sessionName, std::string& error)
+	bool Host::StartServer(uint16_t port, const std::string& sessionName,
+		const std::string& masterUrl, std::string& error)
 	{
 		if (IsHosting())
 		{
@@ -90,6 +91,12 @@ namespace SporeMP
 		std::string commandLine = "\"" + mServerPath + "\"";
 		commandLine += " --port " + std::to_string(port);
 		commandLine += " --name \"" + sessionName + "\"";
+
+		// Register the session on the master so other players can find it.
+		if (!masterUrl.empty())
+		{
+			commandLine += " --master \"" + masterUrl + "\"";
+		}
 
 		STARTUPINFOA startupInfo;
 		std::memset(&startupInfo, 0, sizeof(startupInfo));

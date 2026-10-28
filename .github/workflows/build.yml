@@ -58,6 +58,9 @@ jobs:
       - name: Build dedicated server
         run: msbuild "Server\Spore-Multiplayer-Server\Spore-Multiplayer-Server.vcxproj" /p:Configuration=Release /p:Platform=Win32 /v:minimal
 
+      - name: Build master server
+        run: msbuild "Server\Spore-Multiplayer-Master\Spore-Multiplayer-Master.vcxproj" /p:Configuration=Release /p:Platform=Win32 /v:minimal
+
       - name: Run server integration tests
         shell: pwsh
         run: |
@@ -70,6 +73,12 @@ jobs:
           .\Tools\test-discovery.ps1 -Port 7000 -Seconds 8
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Run master server test
+        shell: pwsh
+        run: |
+          .\Tools\test-master.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Collect artifacts
         shell: pwsh
         run: |
@@ -78,6 +87,8 @@ jobs:
           Copy-Item "Client\Spore-Multiplayer-Client\SporeMultiplayer.ini" "artifacts\" -Force
           Copy-Item "Server\Spore-Multiplayer-Server\bin\Release\Spore-Multiplayer-Server.exe" "artifacts\" -Force
           Copy-Item "Server\Spore-Multiplayer-Server\server.ini" "artifacts\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Master\bin\Release\Spore-Multiplayer-Master.exe" "artifacts\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Master\master.ini" "artifacts\" -Force
           Get-ChildItem "artifacts" | Select-Object Name, Length
 
       - name: Upload client mod
@@ -96,4 +107,13 @@ jobs:
           path: |
             artifacts/Spore-Multiplayer-Server.exe
             artifacts/server.ini
+          if-no-files-found: error
+
+      - name: Upload master server
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-multiplayer-master
+          path: |
+            artifacts/Spore-Multiplayer-Master.exe
+            artifacts/master.ini
           if-no-files-found: error

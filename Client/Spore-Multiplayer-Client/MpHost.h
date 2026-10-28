@@ -23,9 +23,11 @@ namespace SporeMP
 		/// Starts the dedicated server as a child process.
 		/// @param port TCP port of the session.
 		/// @param sessionName Name shown to the other players.
+		/// @param masterUrl Master server to register on, empty for LAN only.
 		/// @param error Filled with a message when something fails.
 		/// @returns true if the process was started.
-		bool StartServer(uint16_t port, const std::string& sessionName, std::string& error);
+		bool StartServer(uint16_t port, const std::string& sessionName,
+			const std::string& masterUrl, std::string& error);
 
 		/// Stops the server that was started by StartServer(), if any.
 		void StopServer();

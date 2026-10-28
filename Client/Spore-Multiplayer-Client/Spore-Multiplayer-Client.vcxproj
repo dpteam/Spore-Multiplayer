@@ -106,10 +106,12 @@
     <ClInclude Include="MpDiscovery.h" />
     <ClInclude Include="MpHost.h" />
     <ClInclude Include="MpLog.h" />
+    <ClInclude Include="MpMaster.h" />
     <ClInclude Include="MpNet.h" />
     <ClInclude Include="MpOverlay.h" />
     <ClInclude Include="MpSession.h" />
     <ClInclude Include="..\..\Shared\MpProtocol.h" />
+    <ClInclude Include="..\..\Shared\MpMasterProtocol.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -122,6 +124,7 @@
     <ClCompile Include="MpDiscovery.cpp" />
     <ClCompile Include="MpHost.cpp" />
     <ClCompile Include="MpLog.cpp" />
+    <ClCompile Include="MpMaster.cpp" />
     <ClCompile Include="MpNet.cpp" />
     <ClCompile Include="MpOverlay.cpp" />
     <ClCompile Include="MpSession.cpp" />

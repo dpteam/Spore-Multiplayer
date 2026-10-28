@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Spore-Multiplayer-Client", 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Spore-Multiplayer-Server", "Server\Spore-Multiplayer-Server\Spore-Multiplayer-Server.vcxproj", "{CF51C83A-0FB9-416E-B251-BE82649C497E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Spore-Multiplayer-Master", "Server\Spore-Multiplayer-Master\Spore-Multiplayer-Master.vcxproj", "{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug DLL|x86 = Debug DLL|x86
@@ -41,6 +43,14 @@ Global
 		{CF51C83A-0FB9-416E-B251-BE82649C497E}.Release DLL|x86.Build.0 = Release|Win32
 		{CF51C83A-0FB9-416E-B251-BE82649C497E}.Release|x86.ActiveCfg = Release|Win32
 		{CF51C83A-0FB9-416E-B251-BE82649C497E}.Release|x86.Build.0 = Release|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Debug DLL|x86.ActiveCfg = Debug|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Debug DLL|x86.Build.0 = Debug|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Debug|x86.ActiveCfg = Debug|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Debug|x86.Build.0 = Debug|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Release DLL|x86.ActiveCfg = Release|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Release DLL|x86.Build.0 = Release|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Release|x86.ActiveCfg = Release|Win32
+		{8E4B2A17-6C3D-4F1A-9B52-7D8E1C4A6F03}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

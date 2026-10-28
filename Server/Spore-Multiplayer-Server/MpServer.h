@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "../../Shared/MpProtocol.h"
+#include "MpMasterClient.h"
 
 namespace SporeMP
 {
@@ -35,6 +36,9 @@ namespace SporeMP
 		int timeoutSeconds = 15;
 		int handshakeTimeoutSeconds = 10;
 		bool allowDuplicateNames = false;
+		/// URL of the master server (e.g. http://play.example.com:17401). Empty
+		/// means the session is only announced on the local network.
+		std::string masterUrl;
 	};
 
 	class Server
@@ -154,6 +158,12 @@ namespace SporeMP
 		ServerConfig mConfig;
 		uintptr_t mListenSocket = static_cast<uintptr_t>(~0);
 		uintptr_t mDiscoverySocket = static_cast<uintptr_t>(~0);
+
+		/// Number of players, published to the master registration thread.
+		std::atomic<int> mPlayerCount{ 0 };
+
+		/// Registration on the master server, only when a master URL is configured.
+		std::unique_ptr<MasterRegistration> mRegistration;
 		std::vector<std::unique_ptr<Client>> mClients;
 		std::vector<CachedAsset> mAssets;
 		uint32_t mNextPlayerId = 1;

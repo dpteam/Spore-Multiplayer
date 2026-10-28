@@ -110,6 +110,7 @@ namespace
 			"  --tick-rate <hz>      State broadcast rate, 1-60 (default: 20)\n"
 			"  --timeout <seconds>   Drop a player after this time without data (default: 15)\n"
 			"  --log-level <level>   debug, info, warning or error (default: info)\n"
+			"  --master <url>        register on a master server, e.g. http://host:17401\n"
 			"  --config <file>       Read the options from an ini file\n"
 			"  --allow-duplicate-names\n"
 			"  --help, --version\n",
@@ -142,6 +143,7 @@ namespace
 			else if (key == "timeout" && ParseInt(value, number)) config.timeoutSeconds = number;
 			else if (key == "handshake_timeout" && ParseInt(value, number)) config.handshakeTimeoutSeconds = number;
 			else if (key == "allow_duplicate_names") config.allowDuplicateNames = (value == "1" || ToLower(value) == "true");
+			else if (key == "master" || key == "master_url") config.masterUrl = value;
 			else if (key == "log_level")
 			{
 				SporeMP::LogLevel level;
@@ -259,6 +261,11 @@ int main(int argc, char** argv)
 		else if (argument == "--allow-duplicate-names")
 		{
 			config.allowDuplicateNames = true;
+		}
+		else if (argument == "--master")
+		{
+			if (!nextValue("--master", value)) return 1;
+			config.masterUrl = value;
 		}
 		else
 		{

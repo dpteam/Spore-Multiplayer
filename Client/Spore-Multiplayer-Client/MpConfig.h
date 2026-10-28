@@ -40,6 +40,9 @@ namespace SporeMP
 		/// Optional explicit path of Spore-Multiplayer-Server.exe.
 		std::string serverExe;
 
+		/// Master server used by mp_internet and by the servers started with mp_host.
+		std::string masterUrl = "play.dartpower.xyz:17401";
+
 		bool hud = false;
 		float hudX = 0.02f;
 		float hudY = 0.35f;
