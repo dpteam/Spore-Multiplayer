@@ -27,7 +27,11 @@ namespace SporeMP
 	/// Closes the log file. Must be called from Dispose().
 	void ShutdownLog();
 
-	void LogMessage(LogLevel level, const char* format, ...);
+		void LogMessage(LogLevel level, const char* format, ...);
+
+	/// Registers a callback that receives every log line (used by the console
+	/// window). Pass nullptr to remove it.
+	void SetConsoleSink(void (*sink)(const char*));
 
 	/// Returns the full path of the log file.
 	const std::string& GetLogPath();

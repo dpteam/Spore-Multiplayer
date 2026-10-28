@@ -102,6 +102,9 @@
     <ClInclude Include="MpAvatars.h" />
     <ClInclude Include="MpCheats.h" />
     <ClInclude Include="MpConfig.h" />
+    <ClInclude Include="MpConsole.h" />
+    <ClInclude Include="MpDiscovery.h" />
+    <ClInclude Include="MpHost.h" />
     <ClInclude Include="MpLog.h" />
     <ClInclude Include="MpNet.h" />
     <ClInclude Include="MpOverlay.h" />
@@ -115,6 +118,9 @@
     <ClCompile Include="MpAvatars.cpp" />
     <ClCompile Include="MpCheats.cpp" />
     <ClCompile Include="MpConfig.cpp" />
+    <ClCompile Include="MpConsole.cpp" />
+    <ClCompile Include="MpDiscovery.cpp" />
+    <ClCompile Include="MpHost.cpp" />
     <ClCompile Include="MpLog.cpp" />
     <ClCompile Include="MpNet.cpp" />
     <ClCompile Include="MpOverlay.cpp" />

@@ -93,7 +93,10 @@ namespace SporeMP
 			else if (key == "port" && ToInt(value, number) && number > 0 && number < 65536) config.port = static_cast<uint16_t>(number);
 			else if (key == "name") config.name = value;
 			else if (key == "auto_connect") config.autoConnect = ToBool(value);
+			else if (key == "session_name") config.sessionName = value;
+			else if (key == "server_exe") config.serverExe = value;
 			else if (key == "hud") config.hud = ToBool(value);
+			else if (key == "console") config.console = ToBool(value);
 			else if (key == "hud_x" && ToFloat(value, decimal)) config.hudX = decimal;
 			else if (key == "hud_y" && ToFloat(value, decimal)) config.hudY = decimal;
 			else if (key == "hud_scale" && ToFloat(value, decimal) && decimal > 0.1f && decimal < 4.0f) config.hudScale = decimal;
@@ -121,9 +124,17 @@ namespace SporeMP
 			"name=" << config.name << "\n"
 			"; Connect automatically when the game starts.\n"
 			"auto_connect=" << (config.autoConnect ? 1 : 0) << "\n"
+			"; Name of the session when hosting from the game (mp_host).\n"
+			"session_name=" << config.sessionName << "\n"
+			"; Path of Spore-Multiplayer-Server.exe. Empty means \"look next to the mod\".\n"
+			"server_exe=" << config.serverExe << "\n"
 			"\n"
 			"[display]\n"
+			"; Show the multiplayer overlay (players, chat, ping).\n"
+			"; The console window shows the same information, so the overlay is off by default.\n"
 			"hud=" << (config.hud ? 1 : 0) << "\n"
+			"; Open a separate console window with the log and the commands.\n"
+			"console=" << (config.console ? 1 : 0) << "\n"
 			"hud_x=" << config.hudX << "\n"
 			"hud_y=" << config.hudY << "\n"
 			"hud_scale=" << config.hudScale << "\n"

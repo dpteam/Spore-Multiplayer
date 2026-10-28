@@ -5,6 +5,7 @@
 #include "MpSession.h"
 #include "MpAssets.h"
 #include "MpAvatars.h"
+#include "MpDiscovery.h"
 #include "MpLog.h"
 
 #include <algorithm>
@@ -167,6 +168,10 @@ namespace SporeMP
 
 		AvatarAssets::Get().Initialize(directory);
 
+		// Start looking for sessions on the local network right away, so the
+		// player only has to pick one from the list.
+		Discovery::Get().Start(mConfig.port);
+
 		if (mConfig.autoConnect)
 		{
 			Connect(mConfig.host, mConfig.port);
@@ -177,6 +182,7 @@ namespace SporeMP
 	{
 		Avatars::Get().Clear();
 		AvatarAssets::Get().Dispose();
+		Discovery::Get().Stop();
 		mNetwork.Disconnect();
 		mPlayers.clear();
 		mIncoming.clear();
@@ -200,6 +206,10 @@ namespace SporeMP
 		mConfig.host = host;
 		mConfig.port = port;
 		SaveClientConfig(mConfigPath, mConfig);
+
+		// The beacons are broadcast from the server port, so the listener has to
+		// use the same one.
+		RestartDiscovery(port);
 
 		mPlayers.clear();
 		Avatars::Get().Clear();
@@ -232,8 +242,29 @@ namespace SporeMP
 		return true;
 	}
 
-	void Session::Disconnect()
+	void Session::ConnectDelayed(const std::string& host, uint16_t port, float delay)
 	{
+		mPendingHost = host;
+		mPendingPort = port;
+		mPendingTimer = delay;
+		mPendingConnect = true;
+
+		// Listen for the beacons of that port meanwhile.
+		RestartDiscovery(port);
+	}
+
+	void Session::RestartDiscovery(uint16_t port)
+	{
+		if (Discovery::Get().IsRunning() && mDiscoveryPort == port) return;
+
+		Discovery::Get().Stop();
+		if (Discovery::Get().Start(port))
+		{
+			mDiscoveryPort = port;
+		}
+	}
+
+	void Session::Disconnect()	{
 		if (mNetwork.GetState() == ConnectionState::Disconnected) return;
 
 		mNetwork.Disconnect();
@@ -280,6 +311,21 @@ namespace SporeMP
 		if (!mInitialized) return;
 
 		UpdateLocalContext();
+
+		// Look for sessions on the local network, even while connected (so the
+		// list is ready when the player disconnects).
+		Discovery::Get().Update();
+
+		// Fire a pending connection once the delay has passed.
+		if (mPendingConnect)
+		{
+			mPendingTimer -= deltaTime;
+			if (mPendingTimer <= 0.0f)
+			{
+				mPendingConnect = false;
+				Connect(mPendingHost, mPendingPort);
+			}
+		}
 
 		mIncoming.clear();
 		mNetwork.DrainIncoming(mIncoming);
@@ -873,6 +919,21 @@ namespace SporeMP
 		AddSystemLine(text);
 		PrintToConsole("[Multiplayer] " + text);
 		MP_LOG_INFO("%s", text.c_str());
+	}
+
+	void Session::ExecuteConsoleCommand(const std::string& command)
+	{
+		if (command.empty()) return;
+
+		// The console has the same commands as the Spore console, so it simply
+		// forwards the line to the cheat manager.
+		auto* manager = App::ICheatManager::Get();
+		if (manager == nullptr) return;
+
+		if (!manager->ProcessLine(command.c_str()))
+		{
+			MP_LOG_WARN("Unknown command: %s (try 'mp_help')", command.c_str());
+		}
 	}
 
 	RemotePlayer* Session::FindPlayer(uint32_t id)

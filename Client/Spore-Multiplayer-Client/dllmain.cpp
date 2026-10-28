@@ -4,6 +4,8 @@
 #include "MpAvatars.h"
 #include "MpCheats.h"
 #include "MpConfig.h"
+#include "MpConsole.h"
+#include "MpHost.h"
 #include "MpLog.h"
 #include "MpOverlay.h"
 #include "MpSession.h"
@@ -47,6 +49,7 @@ namespace
 		// abort the dispatch of the update message and the mod would stop working.
 		try
 		{
+			SporeMP::Console::Get().ProcessCommands();
 			SporeMP::Session::Get().Update(deltaTime);
 			SporeMP::Overlay::Get().Update(deltaTime);
 		}
@@ -81,8 +84,23 @@ void Initialize()
 	MP_LOG_INFO("Spore Multiplayer client starting (data directory: %s)", directory.c_str());
 
 	SporeMP::Session::Get().Initialize(directory);
+
+	// The console replaces the overlay: same information, no screen clutter.
+	if (SporeMP::Session::Get().Config().console)
+	{
+		SporeMP::Console::Get().Initialize();
+	}
+
 	SporeMP::Overlay::Get().Initialize();
 	SporeMP::AddCheats();
+
+	// Hosting looks for the server next to the mod DLL, unless the configuration
+	// specifies an explicit path.
+	SporeMP::Host::Get().Initialize(directory);
+	if (!SporeMP::Session::Get().Config().serverExe.empty())
+	{
+		SporeMP::Host::Get().SetServerPath(SporeMP::Session::Get().Config().serverExe);
+	}
 
 	App::AddUpdateFunction(Update);
 
@@ -97,6 +115,7 @@ void Dispose()
 
 	SporeMP::Overlay::Get().Dispose();
 	SporeMP::Session::Get().Dispose();
+	SporeMP::Console::Get().Shutdown();
 	SporeMP::ShutdownLog();
 }
 

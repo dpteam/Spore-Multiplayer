@@ -16,6 +16,7 @@ namespace SporeMP
 		std::mutex g_logMutex;
 		std::FILE* g_logFile = nullptr;
 		std::string g_logPath;
+		void (*g_consoleSink)(const char*) = nullptr;
 
 		const char* LevelName(LogLevel level)
 		{
@@ -66,6 +67,12 @@ namespace SporeMP
 		}
 	}
 
+	void SetConsoleSink(void (*sink)(const char*))
+	{
+		std::lock_guard<std::mutex> lock(g_logMutex);
+		g_consoleSink = sink;
+	}
+
 	const std::string& GetLogPath()
 	{
 		return g_logPath;
@@ -79,14 +86,29 @@ namespace SporeMP
 		vsnprintf(message, sizeof(message), format, args);
 		va_end(args);
 
-		std::lock_guard<std::mutex> lock(g_logMutex);
-
-		if (g_logFile == nullptr) return;
-
 		SYSTEMTIME time;
 		GetLocalTime(&time);
-		std::fprintf(g_logFile, "[%02d:%02d:%02d] [%-5s] %s\n",
+
+		char line[2200];
+		std::snprintf(line, sizeof(line), "[%02d:%02d:%02d] [%-5s] %s",
 			time.wHour, time.wMinute, time.wSecond, LevelName(level), message);
-		std::fflush(g_logFile);
+
+		// The console sink is called outside the lock: it prints to stdout, which
+		// must never block the log.
+		void (*sink)(const char*) = nullptr;
+		{
+			std::lock_guard<std::mutex> lock(g_logMutex);
+			if (g_logFile != nullptr)
+			{
+				std::fprintf(g_logFile, "%s\n", line);
+				std::fflush(g_logFile);
+			}
+			sink = g_consoleSink;
+		}
+
+		if (sink != nullptr)
+		{
+			sink(line);
+		}
 	}
 }

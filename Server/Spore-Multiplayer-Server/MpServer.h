@@ -98,6 +98,12 @@ namespace SporeMP
 		void CloseClient(Client& client, RejectReason reason, const char* message, bool notify = true);
 		void RemoveClosedClients();
 
+		/// Opens the UDP socket used for the LAN discovery beacons.
+		bool StartDiscovery();
+
+		/// Broadcasts the beacon that lets the clients find this session.
+		void BroadcastBeacon();
+
 		void HandleFrame(Client& client, uint16_t type, const uint8_t* payload, size_t size);
 		void HandleHello(Client& client, const uint8_t* payload, size_t size);
 		void HandleLocalState(Client& client, const uint8_t* payload, size_t size);
@@ -147,6 +153,7 @@ namespace SporeMP
 
 		ServerConfig mConfig;
 		uintptr_t mListenSocket = static_cast<uintptr_t>(~0);
+		uintptr_t mDiscoverySocket = static_cast<uintptr_t>(~0);
 		std::vector<std::unique_ptr<Client>> mClients;
 		std::vector<CachedAsset> mAssets;
 		uint32_t mNextPlayerId = 1;

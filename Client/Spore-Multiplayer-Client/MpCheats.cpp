@@ -3,8 +3,12 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "MpCheats.h"
+#include "MpAssets.h"
 #include "MpAvatars.h"
 #include "MpConfig.h"
+#include "MpConsole.h"
+#include "MpDiscovery.h"
+#include "MpHost.h"
 #include "MpLog.h"
 #include "MpOverlay.h"
 #include "MpSession.h"
@@ -55,13 +59,19 @@ namespace SporeMP
 
 		void Print(const std::string& text)
 		{
+			// Show the output in both consoles: the Spore one (Ctrl+Shift+C) and the
+			// mod console window.
 			App::ConsolePrintF("%s", text.c_str());
+			Console::Get().Print(text);
 		}
 
 		void PrintHelp()
 		{
 			Print("Spore Multiplayer commands:");
-			Print("  mp_connect [host] [port] - connect to a server (default: the ini values)");
+			Print("  mp_host [port] [name]    - start a session and join it");
+			Print("  mp_servers               - list the sessions on the local network");
+			Print("  mp_join [number]         - join a session from that list");
+			Print("  mp_connect [host] [port] - connect to a server by address");
 			Print("  mp_disconnect            - leave the session");
 			Print("  mp_name <name>           - change your name");
 			Print("  mp_say <text>            - send a chat message");
@@ -122,8 +132,138 @@ namespace SporeMP
 			}
 		};
 
-		class DisconnectCheat : public ArgScript::ICommand
+		/// Starts a session: launches the dedicated server and connects to it.
+		class HostCheat : public ArgScript::ICommand
 		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				Session& session = Session::Get();
+				Host& host = Host::Get();
+
+				if (session.IsConnected())
+				{
+					Print("Already connected to a session, use mp_disconnect first");
+					return;
+				}
+
+				uint16_t port = session.Config().port;
+				std::string name = session.Config().sessionName;
+
+				if (line.GetArgumentsCount() >= 2)
+				{
+					const char* portText = line.GetArgumentAt(1);
+					if (portText != nullptr)
+					{
+						const int value = std::atoi(portText);
+						if (value > 0 && value < 65536)
+						{
+							port = static_cast<uint16_t>(value);
+						}
+						else
+						{
+							Print("Invalid port");
+							return;
+						}
+					}
+				}
+
+				const std::string customName = GetRawArguments(line, 2);
+				if (!customName.empty()) name = customName;
+
+				std::string error;
+				if (!host.StartServer(port, name, error))
+				{
+					Print("Could not host: " + error);
+					return;
+				}
+
+				Print("Hosting '" + name + "' on port " + std::to_string(port) +
+					", the other players can use mp_servers to find it");
+
+				// Give the server a moment to open its socket.
+				session.ConnectDelayed("127.0.0.1", port, 1.5f);
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Starts a session and joins it. Usage: mp_host [port] [session name]";
+			}
+		};
+
+		/// Lists the sessions found on the local network.
+		class ServersCheat : public ArgScript::ICommand
+		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				const auto& sessions = Discovery::Get().GetSessions();
+
+				if (sessions.empty())
+				{
+					Print("No sessions found on the local network");
+					Print("Ask the host to run mp_host, or connect directly with mp_connect <ip> [port]");
+					return;
+				}
+
+				Print("Sessions found on the local network:");
+				for (size_t i = 0; i < sessions.size(); ++i)
+				{
+					const DiscoveredSession& session = sessions[i];
+
+					Print("  " + std::to_string(i + 1) + ") " + session.name +
+						"  " + session.address + ":" + std::to_string(session.port) +
+						"  (" + std::to_string(session.players) + "/" + std::to_string(session.maxPlayers) + ")");
+				}
+
+				Print("Use mp_join <number> to join one");
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Lists the Spore Multiplayer sessions found on the local network.";
+			}
+		};
+
+		/// Joins a session from the discovery list.
+		class JoinCheat : public ArgScript::ICommand
+		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				const auto& sessions = Discovery::Get().GetSessions();
+				if (sessions.empty())
+				{
+					Print("No sessions found. Use mp_servers to look again, or mp_connect <ip> [port]");
+					return;
+				}
+
+				size_t index = 0;
+				if (line.GetArgumentsCount() >= 2)
+				{
+					const char* indexText = line.GetArgumentAt(1);
+					const int value = indexText != nullptr ? std::atoi(indexText) : 0;
+					if (value < 1 || value > static_cast<int>(sessions.size()))
+					{
+						Print("Usage: mp_join <number>, see mp_servers");
+						return;
+					}
+					index = static_cast<size_t>(value - 1);
+				}
+
+				const DiscoveredSession& session = sessions[index];
+				Print("Joining '" + session.name + "' at " + session.address + ":" + std::to_string(session.port));
+
+				Session::Get().Connect(session.address, session.port);
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Joins a session found on the local network. Usage: mp_join [number]";
+			}
+		};
+
+		class DisconnectCheat : public ArgScript::ICommand		{
 		public:
 			void ParseLine(const ArgScript::Line& line) override
 			{
@@ -378,6 +518,9 @@ namespace SporeMP
 		}
 
 		manager->AddCheat("mp_connect", new ConnectCheat());
+		manager->AddCheat("mp_host", new HostCheat());
+		manager->AddCheat("mp_servers", new ServersCheat());
+		manager->AddCheat("mp_join", new JoinCheat());
 		manager->AddCheat("mp_disconnect", new DisconnectCheat());
 		manager->AddCheat("mp_name", new NameCheat());
 		manager->AddCheat("mp_say", new SayCheat());

@@ -74,8 +74,15 @@ namespace SporeMP
 		void DestroyOverlayWindow();
 		void Refresh();
 
-		IWindowPtr mpWindow;
-		eastl::intrusive_ptr<OverlayDrawable> mpDrawable;
+		/// Window that holds the HUD block; its area is exactly the block, which is
+		/// what the game clips the drawing to.
+		IWindowPtr mpHudWindow;
+		eastl::intrusive_ptr<OverlayDrawable> mpHudDrawable;
+
+		/// Full screen window used only for the name tags, which need to be drawn
+		/// anywhere on the screen.
+		IWindowPtr mpTagsWindow;
+		eastl::intrusive_ptr<OverlayDrawable> mpTagsDrawable;
 
 		bool mVisible = false;
 		bool mDirty = true;

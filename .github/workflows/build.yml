@@ -64,6 +64,12 @@ jobs:
           .\Tools\test-server.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Run LAN discovery test
+        shell: pwsh
+        run: |
+          .\Tools\test-discovery.ps1 -Port 7000 -Seconds 8
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Collect artifacts
         shell: pwsh
         run: |

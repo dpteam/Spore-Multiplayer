@@ -34,11 +34,20 @@ namespace SporeMP
 		std::string name;
 		bool autoConnect = false;
 
-		bool hud = true;
+		/// Session name used when hosting from the game.
+		std::string sessionName = "Spore Co-op";
+
+		/// Optional explicit path of Spore-Multiplayer-Server.exe.
+		std::string serverExe;
+
+		bool hud = false;
 		float hudX = 0.02f;
 		float hudY = 0.35f;
 		float hudScale = 1.0f;
 		int chatLines = 6;
+
+		/// Open the separate console window with the log and the commands.
+		bool console = true;
 
 		int sendRate = 15;
 		bool showAvatars = true;

@@ -119,6 +119,8 @@ namespace SporeMP
 		mStartTime = NowMs();
 		mRunning = true;
 
+		StartDiscovery();
+
 		MP_LOG_INFO("%s server listening on %s:%d", kProtocolName, mConfig.bindAddress.c_str(), mConfig.port);
 		MP_LOG_INFO("Session '%s', max %d players, %d ticks/s, protocol v%u",
 			mConfig.sessionName.c_str(), mConfig.maxPlayers, mConfig.tickRate, kProtocolVersion);
@@ -139,6 +141,7 @@ namespace SporeMP
 	void Server::Run()
 	{
 		uint64_t lastTick = NowMs();
+		uint64_t lastBeacon = 0;
 
 		while (mRunning && !mStopRequested.load())
 		{
@@ -200,6 +203,12 @@ namespace SporeMP
 				BroadcastStates();
 			}
 
+			if (now - lastBeacon >= static_cast<uint64_t>(kDiscoveryIntervalMs))
+			{
+				lastBeacon = now;
+				BroadcastBeacon();
+			}
+
 			CheckTimeouts();
 			ProcessCommands();
 			RemoveClosedClients();
@@ -222,6 +231,12 @@ namespace SporeMP
 			mListenSocket = kInvalidSocket;
 		}
 
+		if (mDiscoverySocket != kInvalidSocket)
+		{
+			closesocket(ToSocket(mDiscoverySocket));
+			mDiscoverySocket = kInvalidSocket;
+		}
+
 		mRunning = false;
 		MP_LOG_INFO("Server stopped");
 	}
@@ -230,6 +245,75 @@ namespace SporeMP
 	// Networking
 	// ------------------------------------------------------------------------
 
+	bool Server::StartDiscovery()
+	{
+		SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (sock == INVALID_SOCKET)
+		{
+			MP_LOG_WARN("Could not create the discovery socket, LAN discovery is disabled");
+			return false;
+		}
+
+		BOOL broadcast = TRUE;
+		setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast));
+
+		BOOL reuse = TRUE;
+		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
+
+		// The beacons are sent from the same port as the TCP server, so the clients
+		// only have to know one port number.
+		sockaddr_in address;
+		std::memset(&address, 0, sizeof(address));
+		address.sin_family = AF_INET;
+		address.sin_port = htons(mConfig.port);
+		address.sin_addr.s_addr = htonl(INADDR_ANY);
+
+		if (bind(sock, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR)
+		{
+			MP_LOG_WARN("Could not bind the discovery port %d (error %d), LAN discovery is disabled",
+				mConfig.port, WSAGetLastError());
+			closesocket(sock);
+			return false;
+		}
+
+		mDiscoverySocket = static_cast<uintptr_t>(sock);
+		return true;
+	}
+
+	void Server::BroadcastBeacon()
+	{
+		if (mDiscoverySocket == kInvalidSocket) return;
+
+		MsgDiscoveryBeacon beacon;
+		std::memset(&beacon, 0, sizeof(beacon));
+		beacon.magic = kDiscoveryMagic;
+		beacon.protocolVersion = kProtocolVersion;
+		beacon.port = mConfig.port;
+		beacon.players = static_cast<uint16_t>(ReadyClientCount());
+		beacon.maxPlayers = static_cast<uint16_t>(mConfig.maxPlayers);
+		CopyString(beacon.sessionName, sizeof(beacon.sessionName), mConfig.sessionName.c_str());
+
+		sockaddr_in address;
+		std::memset(&address, 0, sizeof(address));
+		address.sin_family = AF_INET;
+		address.sin_port = htons(mConfig.port);
+		address.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+		// Send to the global broadcast address and to the local subnet broadcast,
+		// which is more reliable on machines with several network adapters.
+		const int sent = sendto(ToSocket(mDiscoverySocket), reinterpret_cast<const char*>(&beacon), sizeof(beacon), 0,
+			reinterpret_cast<sockaddr*>(&address), sizeof(address));
+
+		if (sent == SOCKET_ERROR)
+		{
+			static bool reported = false;
+			if (!reported)
+			{
+				reported = true;
+				MP_LOG_WARN("Could not broadcast the discovery beacon (error %d)", WSAGetLastError());
+			}
+		}
+	}
 	void Server::AcceptNewClients()
 	{
 		while (true)

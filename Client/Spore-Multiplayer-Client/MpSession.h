@@ -71,6 +71,13 @@ namespace SporeMP
 		ConnectionState GetState() const;
 		std::string GetStatusText() const;
 
+		/// Connects after a short delay, used after starting a local server so it
+		/// has time to open its socket.
+		void ConnectDelayed(const std::string& host, uint16_t port, float delay);
+
+		/// Restarts the LAN discovery listener on the given port.
+		void RestartDiscovery(uint16_t port);
+
 		// --- commands --------------------------------------------------------
 		void SendChat(const std::string& text);
 		void SetName(const std::string& name);
@@ -106,6 +113,10 @@ namespace SporeMP
 
 		/// Returns the directory where the DLL and the configuration file live.
 		const std::string& GetDirectory() const { return mLogDirectory; }
+
+		/// Executes a command line typed in the mod console. The commands are the
+		/// same ones available in the Spore console (mp_host, mp_join, ...).
+		void ExecuteConsoleCommand(const std::string& command);
 
 	private:
 		Session();
@@ -154,6 +165,15 @@ namespace SporeMP
 		Stage mLocalStage = Stage::kNone;
 		uint32_t mLocalSystemId = 0;
 		ResKey mLocalAvatarKey = { 0, 0, 0 };
+
+		/// Pending delayed connection (see ConnectDelayed).
+		std::string mPendingHost;
+		uint16_t mPendingPort = 0;
+		float mPendingTimer = 0.0f;
+		bool mPendingConnect = false;
+
+		/// Port the discovery listener is using.
+		uint16_t mDiscoveryPort = 0;
 
 		std::vector<RemotePlayer> mPlayers;
 		std::deque<ChatLine> mChatLog;

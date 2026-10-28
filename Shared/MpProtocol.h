@@ -56,6 +56,34 @@ namespace SporeMP
 	constexpr size_t kAssetChunkSize = 1024;
 
 	// ------------------------------------------------------------------------
+	// LAN discovery
+	//
+	// The server broadcasts a small beacon over UDP every couple of seconds, so
+	// the clients can list the sessions available on the local network without
+	// anybody typing an IP address.
+	// ------------------------------------------------------------------------
+
+	/// Magic value at the start of every beacon ("MP" in ASCII).
+	constexpr uint16_t kDiscoveryMagic = 0x504D;
+
+	/// How often the server broadcasts a beacon.
+	constexpr int kDiscoveryIntervalMs = 2000;
+
+	/// A session is removed from the list when no beacon arrives for this long.
+	constexpr int kDiscoveryTimeoutMs = 6000;
+
+	struct MsgDiscoveryBeacon
+	{
+		uint16_t magic;
+		uint16_t protocolVersion;
+		uint16_t port;
+		uint16_t players;
+		uint16_t maxPlayers;
+		uint16_t reserved;
+		char sessionName[kMaxSessionNameLength];
+	};
+
+	// ------------------------------------------------------------------------
 	// Message types
 	// ------------------------------------------------------------------------
 

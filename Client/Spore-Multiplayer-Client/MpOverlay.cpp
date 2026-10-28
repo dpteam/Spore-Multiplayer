@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "MpOverlay.h"
 #include "MpAvatars.h"
+#include "MpDiscovery.h"
 #include "MpLog.h"
 #include "MpSession.h"
 
@@ -22,7 +23,7 @@ namespace SporeMP
 		const Math::Color kTextColor(235, 235, 235, 255);
 		const Math::Color kBackgroundColor(0, 0, 0, 130);
 		const Math::Color kLabelColor(255, 240, 180, 255);
-		const Math::Color kLabelShadow(0, 0, 0, 160);
+		const Math::Color kLabelShadow(0, 0, 0, 170);
 
 		/// Width of the HUD block, in fraction of the screen.
 		const float kWidthFraction = 0.34f;
@@ -76,14 +77,13 @@ namespace SporeMP
 			graphics.SetColor(mBackgroundColor);
 			graphics.FillRectangle(mHudArea.x1, mHudArea.y1, mHudArea.x2, mHudArea.y2);
 
-			graphics.SetColor(mTextColor);
-
 			float y = mHudArea.y1 + kPadding;
 			for (const eastl::string16& line : mLines)
 			{
 				if (!line.empty())
 				{
 					Math::Rectangle lineArea(mHudArea.x1 + kPadding, y, mHudArea.x2 - kPadding, y + mLineHeight);
+					graphics.SetColor(mTextColor);
 					graphics.DrawStringArea(lineArea, line.c_str(), UTFWin::Graphics2D::kAutoLength);
 				}
 				y += mLineHeight;
@@ -144,7 +144,7 @@ namespace SporeMP
 
 	void Overlay::CreateOverlayWindow()
 	{
-		if (mpWindow != nullptr) return;
+		if (mpHudWindow != nullptr) return;
 
 		auto* mainWindow = WindowManager.GetMainWindow();
 		if (mainWindow == nullptr)
@@ -153,49 +153,72 @@ namespace SporeMP
 			return;
 		}
 
-		mpDrawable = new OverlayDrawable();
-		mpDrawable->SetContent({}, Math::Rectangle(), kLineHeight, kTextColor, kBackgroundColor, {}, kLabelColor);
-
-		// The window covers the whole screen so the name tags can be drawn at
-		// absolute coordinates. It is transparent and ignores the mouse.
-		auto* window = new UTFWin::Window();
-		window->SetControlID(id("SporeMultiplayerOverlay"));
-		window->SetDrawable(mpDrawable.get());
-		window->SetFlag(UTFWin::kWinFlagVisible, mVisible);
-		window->SetFlag(UTFWin::kWinFlagIgnoreMouse, true);
-		window->SetFlag(UTFWin::kWinFlagAlwaysInFront, true);
-
 		const Math::Rectangle& screen = mainWindow->GetRealArea();
-		window->SetArea(Math::Rectangle(screen.x1, screen.y1, screen.x2, screen.y2));
 
-		mainWindow->AddWindow(window);
-		mpWindow = window;
+		// The HUD block gets its own window: the game clips a window drawing to its
+		// area, so the window must match the block exactly.
+		mpHudDrawable = new OverlayDrawable();
+		mpHudDrawable->SetContent({}, Math::Rectangle(), kLineHeight, kTextColor, kBackgroundColor, {}, kLabelColor);
+
+		auto* hudWindow = new UTFWin::Window();
+		hudWindow->SetControlID(id("SporeMultiplayerHud"));
+		hudWindow->SetDrawable(mpHudDrawable.get());
+		hudWindow->SetFlag(UTFWin::kWinFlagVisible, mVisible);
+		hudWindow->SetFlag(UTFWin::kWinFlagIgnoreMouse, true);
+		hudWindow->SetFlag(UTFWin::kWinFlagAlwaysInFront, true);
+		hudWindow->SetArea(Math::Rectangle(screen.x1 + 10.0f, screen.y1 + 10.0f,
+			screen.x1 + 310.0f, screen.y1 + 200.0f));
+
+		mainWindow->AddWindow(hudWindow);
+		mpHudWindow = hudWindow;
+
+		// The name tags need to be drawn anywhere on the screen, so they get a
+		// transparent full screen window.
+		mpTagsDrawable = new OverlayDrawable();
+		mpTagsDrawable->SetContent({}, Math::Rectangle(), kLineHeight, kTextColor, kBackgroundColor, {}, kLabelColor);
+
+		auto* tagsWindow = new UTFWin::Window();
+		tagsWindow->SetControlID(id("SporeMultiplayerTags"));
+		tagsWindow->SetDrawable(mpTagsDrawable.get());
+		tagsWindow->SetFlag(UTFWin::kWinFlagVisible, false);
+		tagsWindow->SetFlag(UTFWin::kWinFlagIgnoreMouse, true);
+		tagsWindow->SetFlag(UTFWin::kWinFlagAlwaysInFront, true);
+		tagsWindow->SetArea(Math::Rectangle(screen.x1, screen.y1, screen.x2, screen.y2));
+
+		mainWindow->AddWindow(tagsWindow);
+		mpTagsWindow = tagsWindow;
 
 		mDirty = true;
 	}
 
 	void Overlay::DestroyOverlayWindow()
 	{
-		if (mpWindow != nullptr)
+		auto disposeWindow = [](IWindowPtr& window)
 		{
-			auto* parent = mpWindow->GetParent();
+			if (window == nullptr) return;
+
+			auto* parent = window->GetParent();
 			if (parent != nullptr)
 			{
-				parent->DisposeWindowFamily(mpWindow.get());
+				parent->DisposeWindowFamily(window.get());
 			}
-			mpWindow = nullptr;
-		}
+			window = nullptr;
+		};
 
-		mpDrawable = nullptr;
+		disposeWindow(mpTagsWindow);
+		disposeWindow(mpHudWindow);
+
+		mpTagsDrawable = nullptr;
+		mpHudDrawable = nullptr;
 	}
 
 	void Overlay::SetVisible(bool visible)
 	{
 		mVisible = visible;
 
-		if (mpWindow != nullptr)
+		if (mpHudWindow != nullptr)
 		{
-			mpWindow->SetFlag(UTFWin::kWinFlagVisible, visible);
+			mpHudWindow->SetFlag(UTFWin::kWinFlagVisible, visible);
 		}
 
 		mDirty = true;
@@ -225,7 +248,7 @@ namespace SporeMP
 
 	void Overlay::Refresh()
 	{
-		if (mpWindow == nullptr || mpDrawable == nullptr) return;
+		if (mpHudWindow == nullptr || mpHudDrawable == nullptr) return;
 
 		Session& session = Session::Get();
 
@@ -233,8 +256,6 @@ namespace SporeMP
 		if (mainWindow == nullptr) return;
 
 		const Math::Rectangle& screen = mainWindow->GetRealArea();
-		mpWindow->SetArea(Math::Rectangle(screen.x1, screen.y1, screen.x2, screen.y2));
-		mpWindow->SetFlag(UTFWin::kWinFlagVisible, mVisible);
 
 		// --- HUD lines -------------------------------------------------------
 		std::vector<eastl::string16> lines;
@@ -279,6 +300,36 @@ namespace SporeMP
 					++shown;
 				}
 			}
+			else
+			{
+				// Offline: show what can be joined, so the player does not have to
+				// type an address.
+				const auto& sessions = Discovery::Get().GetSessions();
+				if (!sessions.empty())
+				{
+					lines.push_back(ToText("Sessions found (mp_join <n>):"));
+
+					for (size_t i = 0; i < sessions.size() && i < 5; ++i)
+					{
+						const DiscoveredSession& discovered = sessions[i];
+
+						eastl::string16 line = ToText("  ");
+						line += ToText(std::to_string(i + 1).c_str());
+						line += ToText(") ");
+						line += ToText(discovered.name);
+						line += ToText("  ");
+						line += ToText(std::to_string(discovered.players).c_str());
+						line += ToText("/");
+						line += ToText(std::to_string(discovered.maxPlayers).c_str());
+						lines.push_back(line);
+					}
+				}
+				else
+				{
+					lines.push_back(ToText("mp_host  - start a session"));
+					lines.push_back(ToText("mp_servers - find one"));
+				}
+			}
 
 			// Chat log
 			const auto& chat = session.GetChatLog();
@@ -307,7 +358,8 @@ namespace SporeMP
 			}
 		}
 
-		// --- HUD area --------------------------------------------------------
+		// The HUD window is resized to the block, because the game clips the
+		// drawing to the window area.
 		const float width = screen.GetWidth() * kWidthFraction * session.Config().hudScale;
 		const float hudX = screen.x1 + screen.GetWidth() * session.Config().hudX;
 		const float hudY = screen.y1 + screen.GetHeight() * session.Config().hudY;
@@ -315,7 +367,14 @@ namespace SporeMP
 
 		Math::Rectangle hudArea(hudX, hudY, hudX + width, hudY + hudHeight);
 
+		mpHudWindow->SetArea(hudArea);
+		mpHudWindow->SetFlag(UTFWin::kWinFlagVisible, mVisible);
+		mpHudDrawable->SetContent(lines, hudArea, kLineHeight, kTextColor, kBackgroundColor, {}, kLabelColor);
+		mpHudWindow->Invalidate();
+
 		// --- Name tags -------------------------------------------------------
+		if (mpTagsWindow == nullptr || mpTagsDrawable == nullptr) return;
+
 		std::vector<ScreenLabel> labels;
 
 		if (mVisible && session.IsConnected() && session.Config().showAvatars && session.Config().nameTags)
@@ -327,17 +386,6 @@ namespace SporeMP
 				Math::Point position;
 				if (!Avatars::Get().GetScreenPosition(player.id, position)) continue;
 
-				// One time diagnostic, so the log shows whether the projection works.
-				static int diagnosticCount = 0;
-				if (diagnosticCount < 5)
-				{
-					++diagnosticCount;
-					MP_LOG_DEBUG("Screen position of player %u: %.1f, %.1f (screen %.0fx%.0f)",
-						player.id, position.x, position.y, screen.GetWidth(), screen.GetHeight());
-				}
-
-				// Ignore the points that are not on screen: this also filters out
-				// the avatars that are behind the camera.
 				if (position.x < screen.x1 || position.x > screen.x2) continue;
 				if (position.y < screen.y1 || position.y > screen.y2) continue;
 
@@ -349,8 +397,9 @@ namespace SporeMP
 			}
 		}
 
-		mpDrawable->SetContent(lines, hudArea, kLineHeight, kTextColor, kBackgroundColor, labels, kLabelColor);
-
-		mpWindow->Invalidate();
+		mpTagsWindow->SetArea(Math::Rectangle(screen.x1, screen.y1, screen.x2, screen.y2));
+		mpTagsWindow->SetFlag(UTFWin::kWinFlagVisible, !labels.empty());
+		mpTagsDrawable->SetContent({}, Math::Rectangle(), kLineHeight, kTextColor, kBackgroundColor, labels, kLabelColor);
+		mpTagsWindow->Invalidate();
 	}
 }
