@@ -13,18 +13,20 @@ Ideas and planned work for Spore Multiplayer, roughly ordered by priority.
 - Master server with an HTTP/JSON API and registration/heartbeats
 - Relay server (port 17402) for NAT/CGNAT players without port forwarding
 - Launcher window (WebView2, with a browser fallback) and its server list
+- In-game menu built with the game's UI toolkit (UTFWin)
 - In-game console window that mirrors the log
 - GitHub Actions build + integration tests
 
 ## Medium term
 
 ### SPUI / State* integration
-Replace the plain overlay with proper Spore UI:
-- A `.spui` layout for the multiplayer menu (host / join / server list) loaded
-  through `UILayout`, so it matches the game's look and scales with the UI.
-- Use the game's `UIStateMachine` / `IStateManager` to add a real multiplayer
-  state instead of drawing over whatever state is active.
-- Proper buttons and text fields instead of console commands.
+The menu is built with UTFWin buttons, but not yet with a `.spui` layout, and it
+is drawn over whatever state is active instead of being a real game state. Next
+steps:
+- A `.spui` layout for the multiplayer menu, so it matches the game's look and
+  scales with the UI settings.
+- Use `UIStateMachine` / `IStateManager` to add a real multiplayer state instead
+  of drawing over the current one.
 
 ## Long term
 

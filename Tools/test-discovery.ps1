@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Integration test for the LAN session discovery.
 
@@ -74,12 +74,13 @@ $udp = $null
 
 try {
     Write-Host ''
-    Write-Host "Listening for beacons on UDP $Port for $Seconds s..."
+    Write-Host "Listening for beacons on UDP 17400 for $Seconds s..."
 
     $udp = New-Object System.Net.Sockets.UdpClient
     $udp.Client.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::Socket,
         [System.Net.Sockets.SocketOptionName]::ReuseAddress, $true)
-    $udp.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, $Port)))
+    # The beacons go to the fixed discovery port, not to the game port.
+    $udp.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 17400)))
     $udp.Client.ReceiveTimeout = 2500
 
     $deadline = (Get-Date).AddSeconds($Seconds)

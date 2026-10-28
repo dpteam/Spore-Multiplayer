@@ -7,6 +7,7 @@
 #include "MpConsole.h"
 #include "MpHost.h"
 #include "MpLog.h"
+#include "MpMenu.h"
 #include "MpOverlay.h"
 #include "MpSession.h"
 
@@ -51,6 +52,7 @@ namespace
 		{
 			SporeMP::Console::Get().ProcessCommands();
 			SporeMP::Session::Get().Update(deltaTime);
+			SporeMP::Menu::Get().Update(deltaTime);
 			SporeMP::Overlay::Get().Update(deltaTime);
 		}
 		catch (const std::exception& exception)
@@ -92,6 +94,7 @@ void Initialize()
 	}
 
 	SporeMP::Overlay::Get().Initialize();
+	SporeMP::Menu::Get().Initialize();
 	SporeMP::AddCheats();
 
 	// Hosting looks for the server next to the mod DLL, unless the configuration
@@ -114,6 +117,7 @@ void Dispose()
 	MP_LOG_INFO("Spore Multiplayer client stopping");
 
 	SporeMP::Overlay::Get().Dispose();
+	SporeMP::Menu::Get().Dispose();
 	SporeMP::Session::Get().Dispose();
 	SporeMP::Console::Get().Shutdown();
 	SporeMP::ShutdownLog();

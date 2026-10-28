@@ -306,18 +306,18 @@ namespace SporeMP
 		BOOL reuse = TRUE;
 		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 
-		// The beacons are sent from the same port as the TCP server, so the clients
-		// only have to know one port number.
+		// The beacons are sent from the fixed discovery port, so the clients only
+		// have to know that one number.
 		sockaddr_in address;
 		std::memset(&address, 0, sizeof(address));
 		address.sin_family = AF_INET;
-		address.sin_port = htons(mConfig.port);
+		address.sin_port = htons(kDiscoveryPort);
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
 
 		if (bind(sock, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR)
 		{
-			MP_LOG_WARN("Could not bind the discovery port %d (error %d), LAN discovery is disabled",
-				mConfig.port, WSAGetLastError());
+			MP_LOG_WARN("Could not bind the discovery port %u (error %d), LAN discovery is disabled",
+				kDiscoveryPort, WSAGetLastError());
 			closesocket(sock);
 			return false;
 		}
@@ -339,10 +339,12 @@ namespace SporeMP
 		beacon.maxPlayers = static_cast<uint16_t>(mConfig.maxPlayers);
 		CopyString(beacon.sessionName, sizeof(beacon.sessionName), mConfig.sessionName.c_str());
 
+		// The beacons are sent to the fixed discovery port, so a session on any
+		// game port can be found without configuration.
 		sockaddr_in address;
 		std::memset(&address, 0, sizeof(address));
 		address.sin_family = AF_INET;
-		address.sin_port = htons(mConfig.port);
+		address.sin_port = htons(kDiscoveryPort);
 		address.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
 		// Send to the global broadcast address and to the local subnet broadcast,

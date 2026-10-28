@@ -66,6 +66,10 @@ namespace SporeMP
 	/// Magic value at the start of every beacon ("MP" in ASCII).
 	constexpr uint16_t kDiscoveryMagic = 0x504D;
 
+	/// Fixed UDP port the clients listen on for beacons, independent of the game
+	/// port, so a session on any port can be discovered.
+	constexpr uint16_t kDiscoveryPort = 17400;
+
 	/// How often the server broadcasts a beacon.
 	constexpr int kDiscoveryIntervalMs = 2000;
 

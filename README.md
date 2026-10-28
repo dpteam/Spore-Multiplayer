@@ -271,6 +271,7 @@ You can also set `auto_connect=1` to join as soon as the game starts.
 | Command | Description |
 |---|---|
 | `mp_connect [host] [port]` | Connect to a server (defaults come from the ini file) |
+| `mp_menu [on\|off]` | Open the in-game multiplayer menu |
 | `mp_host [port] [name]` | Start a session and join it |
 | `mp_servers` | List the sessions on the local network |
 | `mp_internet` | List the sessions registered on the master server |

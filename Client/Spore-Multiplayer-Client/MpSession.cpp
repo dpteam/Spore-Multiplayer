@@ -169,8 +169,9 @@ namespace SporeMP
 		AvatarAssets::Get().Initialize(directory);
 
 		// Start looking for sessions on the local network right away, so the
-		// player only has to pick one from the list.
-		Discovery::Get().Start(mConfig.port);
+		// player only has to pick one from the list. The discovery port is fixed,
+		// independent of the game port.
+		Discovery::Get().Start(kDiscoveryPort);
 
 		if (mConfig.autoConnect)
 		{
@@ -210,7 +211,7 @@ namespace SporeMP
 
 		// The beacons are broadcast from the server port, so the listener has to
 		// use the same one.
-		RestartDiscovery(port);
+		RestartDiscovery(kDiscoveryPort);
 
 		mPlayers.clear();
 		Avatars::Get().Clear();
@@ -262,7 +263,7 @@ namespace SporeMP
 		mPendingTicket = relayTicket;
 
 		// Listen for the beacons of that port meanwhile.
-		RestartDiscovery(port);
+		RestartDiscovery(kDiscoveryPort);
 	}
 
 	void Session::RestartDiscovery(uint16_t port)

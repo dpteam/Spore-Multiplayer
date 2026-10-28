@@ -11,6 +11,7 @@
 #include "MpHost.h"
 #include "MpLog.h"
 #include "MpMaster.h"
+#include "MpMenu.h"
 #include "MpOverlay.h"
 #include "MpSession.h"
 
@@ -73,6 +74,7 @@ namespace SporeMP
 		void PrintHelp()
 		{
 			Print("Spore Multiplayer commands:");
+			Print("  mp_menu                  - open the in-game menu");
 			Print("  mp_host [port] [name]    - start a session and join it");
 			Print("  mp_servers               - list the sessions on the local network");
 			Print("  mp_internet              - list the sessions on the master server");
@@ -401,6 +403,35 @@ namespace SporeMP
 			}
 		};
 
+		/// Opens the in-game multiplayer menu.
+		class MenuCheat : public ArgScript::ICommand
+		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				Menu& menu = Menu::Get();
+
+				if (line.GetArgumentsCount() >= 2)
+				{
+					bool visible = false;
+					if (ParseOnOff(line.GetArgumentAt(1), visible))
+					{
+						menu.SetVisible(visible);
+						Print(visible ? "Menu opened" : "Menu closed");
+						return;
+					}
+				}
+
+				menu.Toggle();
+				Print(menu.IsVisible() ? "Menu opened" : "Menu closed");
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Opens the multiplayer menu. Usage: mp_menu [on|off]";
+			}
+		};
+
 		class DisconnectCheat : public ArgScript::ICommand		{
 		public:
 			void ParseLine(const ArgScript::Line& line) override
@@ -657,6 +688,7 @@ namespace SporeMP
 
 		manager->AddCheat("mp_connect", new ConnectCheat());
 		manager->AddCheat("mp_host", new HostCheat());
+		manager->AddCheat("mp_menu", new MenuCheat());
 		manager->AddCheat("mp_servers", new ServersCheat());
 		manager->AddCheat("mp_internet", new InternetCheat());
 		manager->AddCheat("mp_join", new JoinCheat());
