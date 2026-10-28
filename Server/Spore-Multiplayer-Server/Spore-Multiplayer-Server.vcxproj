@@ -90,15 +90,18 @@
   <ItemGroup>
     <ClInclude Include="MpLog.h" />
     <ClInclude Include="MpMasterClient.h" />
+    <ClInclude Include="MpRelayHost.h" />
     <ClInclude Include="MpServer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="..\..\Shared\MpProtocol.h" />
     <ClInclude Include="..\..\Shared\MpMasterProtocol.h" />
+    <ClInclude Include="..\..\Shared\MpRelayProtocol.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MpLog.cpp" />
     <ClCompile Include="MpMasterClient.cpp" />
+    <ClCompile Include="MpRelayHost.cpp" />
     <ClCompile Include="MpServer.cpp" />
   </ItemGroup>
   <ItemGroup>

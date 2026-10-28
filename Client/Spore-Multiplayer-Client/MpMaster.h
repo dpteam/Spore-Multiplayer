@@ -27,6 +27,11 @@ namespace SporeMP
 		int players = 0;
 		int maxPlayers = 0;
 		int version = 0;
+
+		/// Relay of the session, empty when it must be reached directly.
+		std::string relayHost;
+		uint16_t relayPort = 0;
+		std::string ticket;
 	};
 
 	class MasterQuery

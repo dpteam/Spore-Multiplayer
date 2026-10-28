@@ -61,6 +61,9 @@ jobs:
       - name: Build master server
         run: msbuild "Server\Spore-Multiplayer-Master\Spore-Multiplayer-Master.vcxproj" /p:Configuration=Release /p:Platform=Win32 /v:minimal
 
+      - name: Build relay server
+        run: msbuild "Server\Spore-Multiplayer-Relay\Spore-Multiplayer-Relay.vcxproj" /p:Configuration=Release /p:Platform=Win32 /v:minimal
+
       - name: Run server integration tests
         shell: pwsh
         run: |
@@ -79,6 +82,14 @@ jobs:
           .\Tools\test-master.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Run relay tests
+        shell: pwsh
+        run: |
+          .\Tools\test-relay.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\Tools\test-relay-host.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Collect artifacts
         shell: pwsh
         run: |
@@ -89,6 +100,8 @@ jobs:
           Copy-Item "Server\Spore-Multiplayer-Server\server.ini" "artifacts\" -Force
           Copy-Item "Server\Spore-Multiplayer-Master\bin\Release\Spore-Multiplayer-Master.exe" "artifacts\" -Force
           Copy-Item "Server\Spore-Multiplayer-Master\master.ini" "artifacts\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Relay\bin\Release\Spore-Multiplayer-Relay.exe" "artifacts\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Relay\relay.ini" "artifacts\" -Force
           Get-ChildItem "artifacts" | Select-Object Name, Length
 
       - name: Upload client mod
@@ -116,4 +129,13 @@ jobs:
           path: |
             artifacts/Spore-Multiplayer-Master.exe
             artifacts/master.ini
+          if-no-files-found: error
+
+      - name: Upload relay server
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-multiplayer-relay
+          path: |
+            artifacts/Spore-Multiplayer-Relay.exe
+            artifacts/relay.ini
           if-no-files-found: error

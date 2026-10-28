@@ -56,7 +56,8 @@ namespace SporeMP
 		}
 	}
 
-	bool NetworkClient::Connect(const std::string& host, uint16_t port, const MsgHello& hello)
+	bool NetworkClient::Connect(const std::string& host, uint16_t port, const MsgHello& hello,
+		const std::string& relayAddress, const std::string& relayTicket)
 	{
 		if (mState.load() != ConnectionState::Disconnected)
 		{
@@ -92,8 +93,38 @@ namespace SporeMP
 
 		mState.store(ConnectionState::Connecting);
 
-		MP_LOG_INFO("Connecting to %s:%u", host.c_str(), port);
-		mThread = std::thread(&NetworkClient::ThreadMain, this, host, port, hello);
+		// Split "host:port" for the relay, if one was given.
+		std::string relayHost;
+		uint16_t relayPort = 0;
+
+		if (!relayAddress.empty())
+		{
+			std::string value = relayAddress;
+			const size_t scheme = value.find("://");
+			if (scheme != std::string::npos) value = value.substr(scheme + 3);
+
+			const size_t colon = value.find(':');
+			if (colon == std::string::npos)
+			{
+				relayHost = value;
+				relayPort = kDefaultRelayPort;
+			}
+			else
+			{
+				relayHost = value.substr(0, colon);
+				relayPort = static_cast<uint16_t>(std::strtoul(value.c_str() + colon + 1, nullptr, 10));
+			}
+
+			MP_LOG_INFO("Connecting to %s:%u through the relay %s:%u",
+				host.c_str(), port, relayHost.c_str(), relayPort);
+		}
+		else
+		{
+			MP_LOG_INFO("Connecting to %s:%u", host.c_str(), port);
+		}
+
+		mThread = std::thread(&NetworkClient::ThreadMain, this, host, port, hello,
+			relayHost, relayPort, relayTicket);
 		return true;
 	}
 
@@ -311,8 +342,46 @@ namespace SporeMP
 		return true;
 	}
 
-	void NetworkClient::ParseIncoming()
+	bool NetworkClient::ReceiveExact(void* data, size_t size)
 	{
+		uint8_t* dst = static_cast<uint8_t*>(data);
+		size_t offset = 0;
+
+		while (offset < size)
+		{
+			SOCKET sock;
+			{
+				std::lock_guard<std::mutex> lock(mSocketMutex);
+				if (mSocket == kInvalidSocket) return false;
+				sock = ToSocket(mSocket);
+			}
+
+			const int received = recv(sock, reinterpret_cast<char*>(dst + offset),
+				static_cast<int>(size - offset), 0);
+
+			if (received == SOCKET_ERROR)
+			{
+				const int error = WSAGetLastError();
+				if (error == WSAEWOULDBLOCK)
+				{
+					fd_set readSet;
+					FD_ZERO(&readSet);
+					FD_SET(sock, &readSet);
+					timeval timeout = { 5, 0 };
+					select(0, &readSet, nullptr, nullptr, &timeout);
+					continue;
+				}
+				return false;
+			}
+
+			if (received == 0) return false;
+			offset += static_cast<size_t>(received);
+		}
+
+		return true;
+	}
+
+	void NetworkClient::ParseIncoming()	{
 		while (true)
 		{
 			const size_t available = mReadBuffer.size();
@@ -337,12 +406,68 @@ namespace SporeMP
 		}
 	}
 
-	void NetworkClient::ThreadMain(std::string host, uint16_t port, MsgHello hello)
+	void NetworkClient::ThreadMain(std::string host, uint16_t port, MsgHello hello,
+		std::string relayHost, uint16_t relayPort, std::string relayTicket)
 	{
-		if (!OpenSocket(host, port))
+		// Through the relay, the socket goes to the relay, not to the server.
+		const bool useRelay = !relayHost.empty() && relayPort != 0;
+		const std::string connectHost = useRelay ? relayHost : host;
+		const uint16_t connectPort = useRelay ? relayPort : port;
+
+		if (!OpenSocket(connectHost, connectPort))
 		{
 			mState.store(ConnectionState::Disconnected);
 			return;
+		}
+
+		if (useRelay)
+		{
+			// Relay handshake: magic, role = client, reserved, ticket.
+			uint8_t handshake[kRelayHandshakeSize];
+			std::memset(handshake, 0, sizeof(handshake));
+
+			uint16_t magic = kRelayMagic;
+			std::memcpy(handshake, &magic, sizeof(magic));
+			handshake[2] = static_cast<uint8_t>(RelayRole::Client);
+
+			char ticket[kRelayTicketLength] = { 0 };
+			CopyString(ticket, sizeof(ticket), relayTicket.c_str());
+			std::memcpy(handshake + 4, ticket, kRelayTicketLength);
+
+			if (!SendAll(handshake, sizeof(handshake)))
+			{
+				CloseSocket();
+				SetError("Could not send the relay handshake");
+				mState.store(ConnectionState::Disconnected);
+				return;
+			}
+
+			// Wait for the relay answer.
+			uint8_t result = 0xFF;
+			if (!ReceiveExact(&result, 1))
+			{
+				CloseSocket();
+				SetError("The relay did not answer");
+				mState.store(ConnectionState::Disconnected);
+				return;
+			}
+
+			if (result != static_cast<uint8_t>(RelayResult::Ok))
+			{
+				CloseSocket();
+
+				switch (static_cast<RelayResult>(result))
+				{
+				case RelayResult::NoRoom: SetError("The relay room does not exist"); break;
+				case RelayResult::Full: SetError("The relay room is full"); break;
+				default: SetError("The relay refused the connection"); break;
+				}
+
+				mState.store(ConnectionState::Disconnected);
+				return;
+			}
+
+			MP_LOG_INFO("Relay accepted, starting the game handshake");
 		}
 
 		// The Hello message is the first thing the server must receive.

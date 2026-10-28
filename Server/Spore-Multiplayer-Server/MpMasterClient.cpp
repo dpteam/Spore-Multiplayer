@@ -13,6 +13,8 @@
 #include <cstring>
 
 #include "../../Shared/MpMasterProtocol.h"
+#include "../../Shared/MpRelayProtocol.h"
+#include "MpRelayHost.h"
 
 namespace SporeMP
 {
@@ -164,7 +166,8 @@ namespace SporeMP
 	}
 
 	bool MasterRegistration::Start(const std::string& masterUrl, const std::string& sessionName,
-		uint16_t gamePort, int maxPlayers, std::atomic<int>* playerCount)
+		uint16_t gamePort, int maxPlayers, std::atomic<int>* playerCount,
+		const std::string& relayAddress, const std::string& relayTicket)
 	{
 		std::string host;
 		uint16_t port = 0;
@@ -186,6 +189,18 @@ namespace SporeMP
 		const size_t lastSlash = path.find_last_of('/');
 		mPath = (lastSlash == std::string::npos) ? path : path.substr(0, lastSlash);
 
+		// The relay address is published so clients can fall back to it.
+		if (!relayAddress.empty() && ParseRelayAddress(relayAddress, mRelayHost, mRelayPort))
+		{
+			mRelayTicket = relayTicket;
+		}
+		else
+		{
+			mRelayHost.clear();
+			mRelayPort = 0;
+			mRelayTicket.clear();
+		}
+
 		mHost = host;
 		mPort = port;
 		mStopRequested.store(false);
@@ -193,7 +208,7 @@ namespace SporeMP
 		MP_LOG_INFO("Registering on the master at %s:%u", host.c_str(), port);
 
 		mThread = std::thread(&MasterRegistration::ThreadMain, this, host, port, mPath,
-			sessionName, gamePort, maxPlayers, playerCount);
+			sessionName, gamePort, maxPlayers, playerCount, mRelayHost, mRelayTicket);
 
 		return true;
 	}
@@ -222,9 +237,18 @@ namespace SporeMP
 
 	void MasterRegistration::ThreadMain(std::string host, uint16_t port, std::string basePath,
 		std::string sessionName, uint16_t gamePort, int maxPlayers,
-		std::atomic<int>* playerCount)
+		std::atomic<int>* playerCount, std::string relayAddress, std::string relayTicket)
 	{
 		int interval = kMasterHeartbeatSeconds;
+
+		// Extra fields that describe the relay, if one is in use.
+		std::string relayFields;
+		if (!relayAddress.empty())
+		{
+			relayFields = ",\"relayHost\":\"" + JsonEscape(relayAddress) + "\""
+				",\"relayPort\":" + std::to_string(mRelayPort) +
+				",\"ticket\":\"" + JsonEscape(relayTicket) + "\"";
+		}
 
 		// Register, retrying a few times in case the master is still starting.
 		for (int attempt = 0; attempt < 3 && !mStopRequested.load(); ++attempt)
@@ -234,7 +258,8 @@ namespace SporeMP
 				",\"port\":" + std::to_string(gamePort) +
 				",\"players\":0"
 				",\"maxPlayers\":" + std::to_string(maxPlayers) +
-				",\"version\":" + std::to_string(kMasterProtocolVersion) + "}";
+				",\"version\":" + std::to_string(kMasterProtocolVersion) +
+				relayFields + "}";
 
 			std::string response;
 			if (HttpPost(host, port, basePath + "/register", body, response))
@@ -293,7 +318,8 @@ namespace SporeMP
 					",\"port\":" + std::to_string(gamePort) +
 					",\"players\":" + std::to_string(players) +
 					",\"maxPlayers\":" + std::to_string(maxPlayers) +
-					",\"version\":" + std::to_string(kMasterProtocolVersion) + "}";
+					",\"version\":" + std::to_string(kMasterProtocolVersion) +
+					relayFields + "}";
 
 				if (HttpPost(host, port, basePath + "/register", registerBody, response))
 				{

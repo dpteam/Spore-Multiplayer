@@ -43,6 +43,10 @@ namespace SporeMP
 		/// Master server used by mp_internet and by the servers started with mp_host.
 		std::string masterUrl = "play.dartpower.xyz:17401";
 
+		/// Relay used by mp_host, so players can join without port forwarding.
+		/// Empty disables it.
+		std::string relayUrl = "play.dartpower.xyz:17402";
+
 		bool hud = false;
 		float hudX = 0.02f;
 		float hudY = 0.35f;

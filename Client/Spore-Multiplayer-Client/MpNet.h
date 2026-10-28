@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "../../Shared/MpProtocol.h"
+#include "../../Shared/MpRelayProtocol.h"
 
 namespace SporeMP
 {
@@ -42,8 +43,13 @@ namespace SporeMP
 
 		/// Starts connecting in the background. The Hello message is sent as soon as
 		/// the connection is established.
+		/// When `relayAddress` is not empty, the connection goes through the relay:
+		/// the relay handshake is sent first, and the game protocol follows once the
+		/// relay accepts the room.
 		/// @returns false if a connection is already in progress.
-		bool Connect(const std::string& host, uint16_t port, const MsgHello& hello);
+		bool Connect(const std::string& host, uint16_t port, const MsgHello& hello,
+			const std::string& relayAddress = std::string(),
+			const std::string& relayTicket = std::string());
 
 		/// Closes the connection and stops the worker thread.
 		void Disconnect();
@@ -69,10 +75,12 @@ namespace SporeMP
 		void UpdatePing(float deltaTime);
 
 	private:
-		void ThreadMain(std::string host, uint16_t port, MsgHello hello);
+		void ThreadMain(std::string host, uint16_t port, MsgHello hello,
+			std::string relayHost, uint16_t relayPort, std::string relayTicket);
 		bool OpenSocket(const std::string& host, uint16_t port);
 		void CloseSocket();
 		bool SendAll(const uint8_t* data, size_t size);
+		bool ReceiveExact(void* data, size_t size);
 		void ParseIncoming();
 		void PushMessage(MsgType type, const uint8_t* data, size_t size);
 		void SetError(const char* error);

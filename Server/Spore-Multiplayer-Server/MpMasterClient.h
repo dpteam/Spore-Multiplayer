@@ -33,7 +33,9 @@ namespace SporeMP
 		/// Starts the registration thread. `playerCount` is read every heartbeat.
 		/// @returns false if the URL is invalid.
 		bool Start(const std::string& masterUrl, const std::string& sessionName,
-			uint16_t gamePort, int maxPlayers, std::atomic<int>* playerCount);
+			uint16_t gamePort, int maxPlayers, std::atomic<int>* playerCount,
+			const std::string& relayAddress = std::string(),
+			const std::string& relayTicket = std::string());
 
 		/// Unregisters and stops the thread.
 		void Stop();
@@ -43,12 +45,15 @@ namespace SporeMP
 	private:
 		void ThreadMain(std::string host, uint16_t port, std::string path,
 			std::string sessionName, uint16_t gamePort, int maxPlayers,
-			std::atomic<int>* playerCount);
+			std::atomic<int>* playerCount, std::string relayAddress, std::string relayTicket);
 
 		std::string mHost;
 		uint16_t mPort = 0;
 		std::string mPath;
 		std::string mToken;
+		std::string mRelayHost;
+		uint16_t mRelayPort = 0;
+		std::string mRelayTicket;
 
 		std::atomic<bool> mRegistered{ false };
 		std::atomic<bool> mStopRequested{ false };

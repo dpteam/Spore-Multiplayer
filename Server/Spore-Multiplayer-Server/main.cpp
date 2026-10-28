@@ -111,6 +111,8 @@ namespace
 			"  --timeout <seconds>   Drop a player after this time without data (default: 15)\n"
 			"  --log-level <level>   debug, info, warning or error (default: info)\n"
 			"  --master <url>        register on a master server, e.g. http://host:17401\n"
+			"  --relay <host:port>   accept players through a relay (no port forwarding)\n"
+			"  --relay-ticket <hex>  fixed relay ticket (random by default)\n"
 			"  --config <file>       Read the options from an ini file\n"
 			"  --allow-duplicate-names\n"
 			"  --help, --version\n",
@@ -144,6 +146,8 @@ namespace
 			else if (key == "handshake_timeout" && ParseInt(value, number)) config.handshakeTimeoutSeconds = number;
 			else if (key == "allow_duplicate_names") config.allowDuplicateNames = (value == "1" || ToLower(value) == "true");
 			else if (key == "master" || key == "master_url") config.masterUrl = value;
+			else if (key == "relay" || key == "relay_address") config.relayAddress = value;
+			else if (key == "relay_ticket") config.relayTicket = value;
 			else if (key == "log_level")
 			{
 				SporeMP::LogLevel level;
@@ -266,6 +270,16 @@ int main(int argc, char** argv)
 		{
 			if (!nextValue("--master", value)) return 1;
 			config.masterUrl = value;
+		}
+		else if (argument == "--relay")
+		{
+			if (!nextValue("--relay", value)) return 1;
+			config.relayAddress = value;
+		}
+		else if (argument == "--relay-ticket")
+		{
+			if (!nextValue("--relay-ticket", value)) return 1;
+			config.relayTicket = value;
 		}
 		else
 		{

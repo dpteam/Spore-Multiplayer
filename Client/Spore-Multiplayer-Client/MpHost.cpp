@@ -71,7 +71,7 @@ namespace SporeMP
 	}
 
 	bool Host::StartServer(uint16_t port, const std::string& sessionName,
-		const std::string& masterUrl, std::string& error)
+		const std::string& masterUrl, const std::string& relayAddress, std::string& error)
 	{
 		if (IsHosting())
 		{
@@ -96,6 +96,12 @@ namespace SporeMP
 		if (!masterUrl.empty())
 		{
 			commandLine += " --master \"" + masterUrl + "\"";
+		}
+
+		// Accept players through the relay, so no port forwarding is needed.
+		if (!relayAddress.empty())
+		{
+			commandLine += " --relay \"" + relayAddress + "\"";
 		}
 
 		STARTUPINFOA startupInfo;

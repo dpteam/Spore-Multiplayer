@@ -65,15 +65,22 @@ namespace SporeMP
 		void Dispose();
 
 		// --- connection ------------------------------------------------------
-		bool Connect(const std::string& host, uint16_t port);
+		/// Connects to a server, either directly or through a relay.
+		/// @param relayAddress "host:port" of the relay, empty for a direct connection.
+		/// @param relayTicket Ticket of the relay room, empty for a direct connection.
+		bool Connect(const std::string& host, uint16_t port,
+			const std::string& relayAddress = std::string(),
+			const std::string& relayTicket = std::string());
 		void Disconnect();
 		bool IsConnected() const;
 		ConnectionState GetState() const;
 		std::string GetStatusText() const;
 
 		/// Connects after a short delay, used after starting a local server so it
-		/// has time to open its socket.
-		void ConnectDelayed(const std::string& host, uint16_t port, float delay);
+		/// has time to open its socket. The relay parameters are optional.
+		void ConnectDelayed(const std::string& host, uint16_t port, float delay,
+			const std::string& relayAddress = std::string(),
+			const std::string& relayTicket = std::string());
 
 		/// Restarts the LAN discovery listener on the given port.
 		void RestartDiscovery(uint16_t port);
@@ -171,6 +178,8 @@ namespace SporeMP
 		uint16_t mPendingPort = 0;
 		float mPendingTimer = 0.0f;
 		bool mPendingConnect = false;
+		std::string mPendingRelay;
+		std::string mPendingTicket;
 
 		/// Port the discovery listener is using.
 		uint16_t mDiscoveryPort = 0;

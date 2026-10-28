@@ -193,7 +193,8 @@ namespace SporeMP
 	// Connection
 	// ------------------------------------------------------------------------
 
-	bool Session::Connect(const std::string& host, uint16_t port)
+	bool Session::Connect(const std::string& host, uint16_t port,
+		const std::string& relayAddress, const std::string& relayTicket)
 	{
 		if (!mInitialized) return false;
 
@@ -232,22 +233,33 @@ namespace SporeMP
 			hello.shipModel = mLocalAvatarKey;
 		}
 
-		if (!mNetwork.Connect(host, port, hello))
+		if (!mNetwork.Connect(host, port, hello, relayAddress, relayTicket))
 		{
 			Notify("Could not start the connection");
 			return false;
 		}
 
-		Notify("Connecting to " + host + ":" + std::to_string(port) + "...");
+		if (relayAddress.empty())
+		{
+			Notify("Connecting to " + host + ":" + std::to_string(port) + "...");
+		}
+		else
+		{
+			Notify("Connecting through the relay " + relayAddress + "...");
+		}
+
 		return true;
 	}
 
-	void Session::ConnectDelayed(const std::string& host, uint16_t port, float delay)
+	void Session::ConnectDelayed(const std::string& host, uint16_t port, float delay,
+		const std::string& relayAddress, const std::string& relayTicket)
 	{
 		mPendingHost = host;
 		mPendingPort = port;
 		mPendingTimer = delay;
 		mPendingConnect = true;
+		mPendingRelay = relayAddress;
+		mPendingTicket = relayTicket;
 
 		// Listen for the beacons of that port meanwhile.
 		RestartDiscovery(port);
@@ -323,7 +335,7 @@ namespace SporeMP
 			if (mPendingTimer <= 0.0f)
 			{
 				mPendingConnect = false;
-				Connect(mPendingHost, mPendingPort);
+				Connect(mPendingHost, mPendingPort, mPendingRelay, mPendingTicket);
 			}
 		}
 

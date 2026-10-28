@@ -229,6 +229,18 @@ namespace SporeMP
 			session.maxPlayers = JsonGetInt(object, "maxPlayers", 0);
 			session.version = JsonGetInt(object, "version", 0);
 
+			// Relay information, when the session is behind NAT.
+			session.relayHost = JsonGetString(object, "relayHost");
+			session.relayPort = static_cast<uint16_t>(JsonGetInt(object, "relayPort", 0));
+			session.ticket = JsonGetString(object, "ticket");
+
+			if (session.relayHost.empty() || session.relayPort == 0)
+			{
+				session.relayHost.clear();
+				session.relayPort = 0;
+				session.ticket.clear();
+			}
+
 			if (!session.host.empty() && session.port != 0)
 			{
 				dst.push_back(session);

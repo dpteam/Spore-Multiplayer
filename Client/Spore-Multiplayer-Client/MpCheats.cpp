@@ -21,6 +21,10 @@ namespace SporeMP
 {
 	namespace
 	{
+		/// Last list fetched from the master, so mp_join can use it right after
+		/// mp_internet without asking again.
+		std::vector<PublicSession> g_publicSessions;
+
 		/// Joins the arguments of an ArgScript line starting at `fromArgument`.
 		/// Used for chat messages and names, which can contain spaces.
 		std::string GetRawArguments(const ArgScript::Line& line, size_t fromArgument)
@@ -73,6 +77,7 @@ namespace SporeMP
 			Print("  mp_servers               - list the sessions on the local network");
 			Print("  mp_internet              - list the sessions on the master server");
 			Print("  mp_join [number]         - join a session from that list");
+			Print("  mp_relay <host> <port> <ticket> - join through a relay");
 			Print("  mp_connect [host] [port] - connect to a server by address");
 			Print("  mp_disconnect            - leave the session");
 			Print("  mp_name <name>           - change your name");
@@ -174,7 +179,8 @@ namespace SporeMP
 				if (!customName.empty()) name = customName;
 
 				std::string error;
-				if (!host.StartServer(port, name, session.Config().masterUrl, error))
+				if (!host.StartServer(port, name, session.Config().masterUrl,
+					session.Config().relayUrl, error))
 				{
 					Print("Could not host: " + error);
 					return;
@@ -227,16 +233,92 @@ namespace SporeMP
 			}
 		};
 
-		/// Joins a session from the discovery list.
-		class JoinCheat : public ArgScript::ICommand
+		/// Connects through a relay, for hosts without port forwarding.
+		class RelayCheat : public ArgScript::ICommand
 		{
 		public:
 			void ParseLine(const ArgScript::Line& line) override
 			{
+				const size_t count = line.GetArgumentsCount();
+				if (count < 3)
+				{
+					Print("Usage: mp_relay <host> <port> <ticket>");
+					Print("Get the address and the ticket from the host, or use mp_internet");
+					return;
+				}
+
+				const char* hostText = line.GetArgumentAt(1);
+				const char* portText = line.GetArgumentAt(2);
+				const char* ticketText = line.GetArgumentAt(3);
+
+				const int port = portText != nullptr ? std::atoi(portText) : 0;
+				if (hostText == nullptr || port <= 0 || port >= 65536 || ticketText == nullptr)
+				{
+					Print("Usage: mp_relay <host> <port> <ticket>");
+					return;
+				}
+
+				const std::string relayAddress = std::string(hostText) + ":" + std::to_string(port);
+
+				Print("Connecting through the relay " + relayAddress);
+
+				// Through a relay the host address is irrelevant: everything goes
+				// through the relay room.
+				Session::Get().Connect("127.0.0.1", 0, relayAddress, ticketText);
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Connects through a relay server. Usage: mp_relay <host> <port> <ticket>";
+			}
+		};
+
+		/// Joins a session from the discovery list.
+		class JoinCheat : public ArgScript::ICommand		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
 				const auto& sessions = Discovery::Get().GetSessions();
+
+				// Prefer the local network; fall back to the public list fetched by
+				// mp_internet, so the same command works in both cases.
+				if (sessions.empty() && !g_publicSessions.empty())
+				{
+					size_t index = 0;
+					if (line.GetArgumentsCount() >= 2)
+					{
+						const char* indexText = line.GetArgumentAt(1);
+						const int value = indexText != nullptr ? std::atoi(indexText) : 0;
+						if (value < 1 || value > static_cast<int>(g_publicSessions.size()))
+						{
+							Print("Usage: mp_join <number>, see mp_internet");
+							return;
+						}
+						index = static_cast<size_t>(value - 1);
+					}
+
+					const PublicSession& session = g_publicSessions[index];
+
+					if (!session.relayHost.empty())
+					{
+						const std::string relayAddress =
+							session.relayHost + ":" + std::to_string(session.relayPort);
+
+						Print("Joining '" + session.name + "' through the relay " + relayAddress);
+						Session::Get().Connect("127.0.0.1", 0, relayAddress, session.ticket);
+					}
+					else
+					{
+						Print("Joining '" + session.name + "' at " + session.host + ":" +
+							std::to_string(session.port));
+						Session::Get().Connect(session.host, session.port);
+					}
+					return;
+				}
+
 				if (sessions.empty())
 				{
-					Print("No sessions found. Use mp_servers to look again, or mp_connect <ip> [port]");
+					Print("No sessions found. Use mp_servers or mp_internet first");
 					return;
 				}
 
@@ -294,17 +376,23 @@ namespace SporeMP
 					return;
 				}
 
+				g_publicSessions = sessions;
+
 				Print("Public sessions (" + std::to_string(sessions.size()) + "):");
 				for (size_t i = 0; i < sessions.size(); ++i)
 				{
 					const PublicSession& session = sessions[i];
 
+					const std::string where = session.relayHost.empty()
+						? session.host + ":" + std::to_string(session.port)
+						: "via relay " + session.relayHost;
+
 					Print("  " + std::to_string(i + 1) + ") " + session.name +
-						"  " + session.host + ":" + std::to_string(session.port) +
+						"  " + where +
 						"  (" + std::to_string(session.players) + "/" + std::to_string(session.maxPlayers) + ")");
 				}
 
-				Print("Use mp_connect <host> <port> to join one");
+				Print("Use mp_join <number> to join one");
 			}
 
 			const char* GetDescription(ArgScript::DescriptionMode mode) const override
@@ -572,6 +660,7 @@ namespace SporeMP
 		manager->AddCheat("mp_servers", new ServersCheat());
 		manager->AddCheat("mp_internet", new InternetCheat());
 		manager->AddCheat("mp_join", new JoinCheat());
+		manager->AddCheat("mp_relay", new RelayCheat());
 		manager->AddCheat("mp_disconnect", new DisconnectCheat());
 		manager->AddCheat("mp_name", new NameCheat());
 		manager->AddCheat("mp_say", new SayCheat());

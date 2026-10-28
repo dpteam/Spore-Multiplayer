@@ -44,11 +44,15 @@ That keeps it compatible with mods, saves and the single player campaign.
 Client/Spore-Multiplayer-Client/   The mod DLL (Spore ModAPI)
 Server/Spore-Multiplayer-Server/   The dedicated server (plain Win32 console app)
 Server/Spore-Multiplayer-Master/   The master server (HTTP + JSON API)
+Server/Spore-Multiplayer-Relay/    The relay server (NAT traversal)
 Shared/MpProtocol.h                The game wire protocol, used by both sides
 Shared/MpMasterProtocol.h          The master HTTP/JSON protocol
+Shared/MpRelayProtocol.h           The relay handshake
 Tools/test-server.ps1              Integration test: fake clients against the real server
 Tools/test-master.ps1              Integration test for the master server
 Tools/test-discovery.ps1           Integration test for the LAN discovery
+Tools/test-relay.ps1               Integration test for the relay forwarding
+Tools/test-relay-host.ps1          End-to-end test: game protocol through the relay
 Tools/fake-client.ps1              A fake client that joins and flies around
 Tools/download-test-creations.py   Fetches real creations from the Sporepedia
 Tools/send-console-command.ps1     Sends a command to the mod console
@@ -201,6 +205,25 @@ The public address of a session is taken from the connection, so the game server
 reach the master — no extra configuration. Sessions that stop sending heartbeats are dropped
 after `timeout` seconds.
 
+### Relay (no port forwarding)
+
+If the host cannot open a port (NAT, CGNAT, corporate network), start a relay and point the
+server at it. Both sides connect out, so no forwarding is needed:
+
+```
+Spore-Multiplayer-Relay.exe --port 17402
+Spore-Multiplayer-Server.exe --port 7000 --relay play.dartpower.xyz:17402
+```
+
+The server logs the ticket it got and publishes it to the master, so other players just run
+`mp_internet` and `mp_join <n>`. Manually, the ticket is used like this:
+
+```
+mp_relay play.dartpower.xyz 17402 <ticket>
+```
+
+A relay room carries one player at a time; the server reconnects after each one leaves.
+
 ### 2. Configure the client
 
 `SporeMultiplayer.ini` is created next to the mod DLL the first time the game starts:
@@ -250,6 +273,7 @@ You can also set `auto_connect=1` to join as soon as the game starts.
 | `mp_host [port] [name]` | Start a session and join it |
 | `mp_servers` | List the sessions on the local network |
 | `mp_internet` | List the sessions registered on the master server |
+| `mp_relay <host> <port> <ticket>` | Join a session through a relay (no port forwarding needed) |
 | `mp_join [number]` | Join a session from the `mp_servers` list |
 | `mp_disconnect` | Leave the session |
 | `mp_name <name>` | Change the name shown to the other players |

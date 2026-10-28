@@ -121,12 +121,31 @@ namespace SporeMP
 
 		StartDiscovery();
 
+		// Bridge to the relay, so players can join without any port forwarding.
+		if (!mConfig.relayAddress.empty())
+		{
+			mRelayHost.reset(new RelayHost());
+
+			std::string error;
+			if (mRelayHost->Start(mConfig.relayAddress, mConfig.relayTicket, mConfig.port, error))
+			{
+				mConfig.relayTicket = mRelayHost->GetTicket();
+				MP_LOG_INFO("Session is reachable through the relay with ticket %s", mConfig.relayTicket.c_str());
+			}
+			else
+			{
+				MP_LOG_WARN("Could not use the relay: %s", error.c_str());
+				mRelayHost.reset();
+			}
+		}
+
 		// Announce the session on the master, if one was configured.
 		if (!mConfig.masterUrl.empty())
 		{
 			mRegistration.reset(new MasterRegistration());
 			if (!mRegistration->Start(mConfig.masterUrl, mConfig.sessionName,
-				mConfig.port, mConfig.maxPlayers, &mPlayerCount))
+				mConfig.port, mConfig.maxPlayers, &mPlayerCount,
+				mConfig.relayAddress, mConfig.relayTicket))
 			{
 				mRegistration.reset();
 			}
@@ -256,6 +275,12 @@ namespace SporeMP
 		{
 			mRegistration->Stop();
 			mRegistration.reset();
+		}
+
+		if (mRelayHost != nullptr)
+		{
+			mRelayHost->Stop();
+			mRelayHost.reset();
 		}
 
 		mRunning = false;

@@ -24,10 +24,11 @@ namespace SporeMP
 		/// @param port TCP port of the session.
 		/// @param sessionName Name shown to the other players.
 		/// @param masterUrl Master server to register on, empty for LAN only.
+		/// @param relayAddress Relay to accept players through, empty to listen directly.
 		/// @param error Filled with a message when something fails.
 		/// @returns true if the process was started.
 		bool StartServer(uint16_t port, const std::string& sessionName,
-			const std::string& masterUrl, std::string& error);
+			const std::string& masterUrl, const std::string& relayAddress, std::string& error);
 
 		/// Stops the server that was started by StartServer(), if any.
 		void StopServer();

@@ -60,6 +60,12 @@ namespace SporeMP
 			int maxPlayers = 0;
 			int version = 0;
 			uint64_t lastSeen = 0;
+
+			/// Relay used by the session, if any: clients behind NAT can join
+			/// through it instead of connecting directly.
+			std::string relayHost;
+			uint16_t relayPort = 0;
+			std::string relayTicket;
 		};
 
 		struct Request

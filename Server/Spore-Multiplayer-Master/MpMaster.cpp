@@ -454,6 +454,19 @@ namespace SporeMP
 		session.lastSeen = NowMs();
 		session.token = GenerateToken();
 
+		// Optional relay information: when present, the session can be reached
+		// without a direct connection.
+		session.relayHost = JsonGetString(request.body, "relayHost");
+		session.relayPort = static_cast<uint16_t>(JsonGetInt(request.body, "relayPort", 0));
+		session.relayTicket = JsonGetString(request.body, "ticket");
+
+		if (session.relayHost.empty() || session.relayPort == 0)
+		{
+			session.relayHost.clear();
+			session.relayPort = 0;
+			session.relayTicket.clear();
+		}
+
 		if (session.port == 0)
 		{
 			WriteResponse(socket, 400, StatusText(400), "{\"error\":\"port is required\"}");
@@ -541,6 +554,15 @@ namespace SporeMP
 			body += ",\"players\":" + std::to_string(session.players);
 			body += ",\"maxPlayers\":" + std::to_string(session.maxPlayers);
 			body += ",\"version\":" + std::to_string(session.version);
+
+			// Relay information, so a client behind NAT can still join.
+			if (!session.relayHost.empty())
+			{
+				body += ",\"relayHost\":\"" + JsonEscape(session.relayHost) + "\"";
+				body += ",\"relayPort\":" + std::to_string(session.relayPort);
+				body += ",\"ticket\":\"" + JsonEscape(session.relayTicket) + "\"";
+			}
+
 			body += "}";
 		}
 

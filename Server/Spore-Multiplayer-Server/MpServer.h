@@ -23,6 +23,7 @@
 
 #include "../../Shared/MpProtocol.h"
 #include "MpMasterClient.h"
+#include "MpRelayHost.h"
 
 namespace SporeMP
 {
@@ -39,6 +40,10 @@ namespace SporeMP
 		/// URL of the master server (e.g. http://play.example.com:17401). Empty
 		/// means the session is only announced on the local network.
 		std::string masterUrl;
+		/// Relay server used to accept players without port forwarding, empty to
+		/// listen directly.
+		std::string relayAddress;
+		std::string relayTicket;
 	};
 
 	class Server
@@ -164,6 +169,9 @@ namespace SporeMP
 
 		/// Registration on the master server, only when a master URL is configured.
 		std::unique_ptr<MasterRegistration> mRegistration;
+
+		/// Bridge to the relay, only when a relay address is configured.
+		std::unique_ptr<RelayHost> mRelayHost;
 		std::vector<std::unique_ptr<Client>> mClients;
 		std::vector<CachedAsset> mAssets;
 		uint32_t mNextPlayerId = 1;
