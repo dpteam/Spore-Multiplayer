@@ -11,15 +11,23 @@
 #include "MpOverlay.h"
 #include "MpSession.h"
 
+#include <cstring>
+#include <vector>
+
+#pragma comment(lib, "version.lib")
+
 namespace
 {
 	/// Directory of the mod DLL, with a trailing backslash. It is resolved from the
 	/// module handle, because GetModuleFileName(nullptr) would return the path of
 	/// SporeApp.exe instead of the path of this DLL.
 	std::string g_moduleDirectory;
+	HMODULE g_moduleHandle = nullptr;
 
 	void ResolveModuleDirectory(HMODULE module)
 	{
+		g_moduleHandle = module;
+
 		char path[MAX_PATH] = { 0 };
 		const DWORD length = GetModuleFileNameA(module, path, MAX_PATH);
 		if (length == 0) return;
@@ -28,6 +36,83 @@ namespace
 		const size_t separator = fullPath.find_last_of("\\/");
 		if (separator == std::string::npos) return;
 		g_moduleDirectory = fullPath.substr(0, separator + 1);
+	}
+
+	/// Logs everything needed to diagnose a report: paths, versions, OS and the
+	/// effective configuration. Runs once at startup and again from `mp_diag`.
+	void LogEnvironment()
+	{
+		// OS version. GetVersionEx lies unless the app is manifested for Windows 10,
+		// so RtlGetVersion is used instead.
+		MP_LOG_INFO("--- environment ---");
+
+		typedef LONG(WINAPI* RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+
+		HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+		RtlGetVersionPtr rtlGetVersion = ntdll != nullptr
+			? reinterpret_cast<RtlGetVersionPtr>(GetProcAddress(ntdll, "RtlGetVersion"))
+			: nullptr;
+
+		if (rtlGetVersion != nullptr)
+		{
+			RTL_OSVERSIONINFOW info;
+			std::memset(&info, 0, sizeof(info));
+			info.dwOSVersionInfoSize = sizeof(info);
+
+			if (rtlGetVersion(&info) == 0)
+			{
+				MP_LOG_INFO("OS: %lu.%lu build %lu",
+					info.dwMajorVersion, info.dwMinorVersion, info.dwBuildNumber);
+			}
+		}
+
+		// This DLL and the game executable.
+		char modulePath[MAX_PATH] = { 0 };
+		if (GetModuleFileNameA(g_moduleHandle, modulePath, MAX_PATH) != 0)
+		{
+			MP_LOG_INFO("Mod DLL: %s", modulePath);
+		}
+
+		char gamePath[MAX_PATH] = { 0 };
+		if (GetModuleFileNameA(nullptr, gamePath, MAX_PATH) != 0)
+		{
+			MP_LOG_INFO("Game exe: %s", gamePath);
+
+			// Spore's own version, which matters because the SDK targets it.
+			DWORD ignored = 0;
+			const DWORD size = GetFileVersionInfoSizeA(gamePath, &ignored);
+			if (size > 0)
+			{
+				std::vector<uint8_t> data(size);
+				if (GetFileVersionInfoA(gamePath, 0, size, data.data()))
+				{
+					VS_FIXEDFILEINFO* info = nullptr;
+					UINT infoSize = 0;
+					if (VerQueryValueA(data.data(), "\\", reinterpret_cast<void**>(&info), &infoSize) && info != nullptr)
+					{
+						MP_LOG_INFO("Spore version: %u.%u.%u.%u",
+							HIWORD(info->dwFileVersionMS), LOWORD(info->dwFileVersionMS),
+							HIWORD(info->dwFileVersionLS), LOWORD(info->dwFileVersionLS));
+					}
+				}
+			}
+		}
+
+		MP_LOG_INFO("Log file: %s", SporeMP::GetLogPath().c_str());
+		MP_LOG_INFO("Process id: %lu", static_cast<unsigned long>(GetCurrentProcessId()));
+
+		// Effective configuration, secrets aside.
+		const SporeMP::ClientConfig& config = SporeMP::Session::Get().Config();
+		MP_LOG_INFO("--- configuration ---");
+		MP_LOG_INFO("host=%s port=%u name='%s' auto_connect=%d",
+			config.host.c_str(), config.port, config.name.c_str(), config.autoConnect ? 1 : 0);
+		MP_LOG_INFO("master=%s relay=%s",
+			config.masterUrl.c_str(), config.relayUrl.c_str());
+		MP_LOG_INFO("hud=%d console=%d send_rate=%d avatars=%d tags=%d interpolation=%d log_level=%s",
+			config.hud ? 1 : 0, config.console ? 1 : 0, config.sendRate,
+			config.showAvatars ? 1 : 0, config.nameTags ? 1 : 0,
+			config.interpolation ? 1 : 0, config.logLevel.c_str());
+		MP_LOG_INFO("--- end environment ---");
 	}
 
 	/// Called once every game frame by the App update message.
@@ -86,6 +171,7 @@ void Initialize()
 	MP_LOG_INFO("Spore Multiplayer client starting (data directory: %s)", directory.c_str());
 
 	SporeMP::Session::Get().Initialize(directory);
+	LogEnvironment();
 
 	// The console replaces the overlay: same information, no screen clutter.
 	if (SporeMP::Session::Get().Config().console)

@@ -17,6 +17,25 @@ namespace SporeMP
 		std::FILE* g_logFile = nullptr;
 		std::string g_logPath;
 		void (*g_consoleSink)(const char*) = nullptr;
+		LogLevel g_logLevel = LogLevel::Info;
+
+		bool EqualsIgnoreCase(const char* a, const char* b)
+		{
+			if (a == nullptr || b == nullptr) return false;
+
+			while (*a != '\0' && *b != '\0')
+			{
+				char ca = *a;
+				char cb = *b;
+				if (ca >= 'A' && ca <= 'Z') ca = static_cast<char>(ca - 'A' + 'a');
+				if (cb >= 'A' && cb <= 'Z') cb = static_cast<char>(cb - 'A' + 'a');
+				if (ca != cb) return false;
+				++a;
+				++b;
+			}
+
+			return *a == '\0' && *b == '\0';
+		}
 
 		const char* LevelName(LogLevel level)
 		{
@@ -67,6 +86,27 @@ namespace SporeMP
 		}
 	}
 
+	void SetLogLevel(LogLevel level)
+	{
+		std::lock_guard<std::mutex> lock(g_logMutex);
+		g_logLevel = level;
+	}
+
+	LogLevel GetLogLevel()
+	{
+		std::lock_guard<std::mutex> lock(g_logMutex);
+		return g_logLevel;
+	}
+
+	bool ParseLogLevel(const char* name, LogLevel& dst)
+	{
+		if (EqualsIgnoreCase(name, "debug")) { dst = LogLevel::Debug; return true; }
+		if (EqualsIgnoreCase(name, "info")) { dst = LogLevel::Info; return true; }
+		if (EqualsIgnoreCase(name, "warning") || EqualsIgnoreCase(name, "warn")) { dst = LogLevel::Warning; return true; }
+		if (EqualsIgnoreCase(name, "error")) { dst = LogLevel::Error; return true; }
+		return false;
+	}
+
 	void SetConsoleSink(void (*sink)(const char*))
 	{
 		std::lock_guard<std::mutex> lock(g_logMutex);
@@ -80,6 +120,8 @@ namespace SporeMP
 
 	void LogMessage(LogLevel level, const char* format, ...)
 	{
+		if (level < GetLogLevel()) return;
+
 		char message[2048];
 		va_list args;
 		va_start(args, format);

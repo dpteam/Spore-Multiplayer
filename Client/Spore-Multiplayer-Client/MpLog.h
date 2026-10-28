@@ -24,6 +24,14 @@ namespace SporeMP
 	/// Prepares the log file. Must be called from Initialize().
 	void InitializeLog(const std::string& directory);
 
+	/// Sets the minimum level that is written. Defaults to Info.
+	void SetLogLevel(LogLevel level);
+
+	LogLevel GetLogLevel();
+
+	/// Parses "debug", "info", "warning", "error". Returns false if unknown.
+	bool ParseLogLevel(const char* name, LogLevel& dst);
+
 	/// Closes the log file. Must be called from Dispose().
 	void ShutdownLog();
 

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <ctime>
 #include <mutex>
+#include <share.h>
 #include <string>
 
 #include <windows.h>
@@ -17,6 +18,8 @@ namespace SporeMP
 	{
 		std::mutex g_logMutex;
 		LogLevel g_logLevel = LogLevel::Info;
+		std::FILE* g_logFile = nullptr;
+		std::string g_logPath;
 
 		bool EqualsIgnoreCase(const char* a, const char* b)
 		{
@@ -43,6 +46,40 @@ namespace SporeMP
 	LogLevel GetLogLevel()
 	{
 		return g_logLevel;
+	}
+
+	void SetLogFile(const std::string& path)
+	{
+		std::lock_guard<std::mutex> lock(g_logMutex);
+
+		if (g_logFile != nullptr)
+		{
+			std::fclose(g_logFile);
+			g_logFile = nullptr;
+		}
+
+		g_logPath = path;
+		if (path.empty()) return;
+
+		// _SH_DENYNO: several servers on one machine, and other tools, can read it.
+		g_logFile = _fsopen(path.c_str(), "a", _SH_DENYNO);
+		if (g_logFile == nullptr)
+		{
+			g_logPath.clear();
+			return;
+		}
+
+		SYSTEMTIME time;
+		GetLocalTime(&time);
+		std::fprintf(g_logFile, "\n===== Server started %04d-%02d-%02d %02d:%02d:%02d (pid %lu) =====\n",
+			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond,
+			static_cast<unsigned long>(GetCurrentProcessId()));
+		std::fflush(g_logFile);
+	}
+
+	const std::string& GetLogFile()
+	{
+		return g_logPath;
 	}
 
 	const char* LogLevelName(LogLevel level)
@@ -83,5 +120,12 @@ namespace SporeMP
 		std::printf("[%02d:%02d:%02d] [%-7s] %s\n",
 			time.wHour, time.wMinute, time.wSecond, LogLevelName(level), message);
 		std::fflush(stdout);
+
+		if (g_logFile != nullptr)
+		{
+			std::fprintf(g_logFile, "[%02d:%02d:%02d] [%-7s] %s\n",
+				time.wHour, time.wMinute, time.wSecond, LogLevelName(level), message);
+			std::fflush(g_logFile);
+		}
 	}
 }

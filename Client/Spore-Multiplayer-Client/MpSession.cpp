@@ -163,6 +163,17 @@ namespace SporeMP
 			mConfig.name = "Player";
 		}
 
+		// Apply the configured log level before anything else is logged.
+		LogLevel level;
+		if (ParseLogLevel(mConfig.logLevel.c_str(), level))
+		{
+			SetLogLevel(level);
+		}
+		else
+		{
+			MP_LOG_WARN("Unknown log_level '%s', using info", mConfig.logLevel.c_str());
+		}
+
 		mLocalName = mConfig.name;
 		mInitialized = true;
 

@@ -1,4 +1,4 @@
-/****************************************************************************
+﻿/****************************************************************************
 * Spore Multiplayer - Dedicated server
 *
 * Minimal logging helpers. The server writes everything to stdout, which makes
@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdarg>
+#include <string>
 
 namespace SporeMP
 {
@@ -22,6 +23,15 @@ namespace SporeMP
 	void SetLogLevel(LogLevel level);
 
 	LogLevel GetLogLevel();
+
+	/// Redirects the log to a file as well as stdout. Passing an empty path
+	/// disables the file. The default is `<exe dir>\SporeMultiplayer-Server.log`,
+	/// which matters because the server is often started hidden (mp_host) and its
+	/// stdout is lost otherwise.
+	void SetLogFile(const std::string& path);
+
+	/// Returns the current log file path, empty if file logging is disabled.
+	const std::string& GetLogFile();
 
 	/// Returns "debug", "info", "warning" or "error".
 	const char* LogLevelName(LogLevel level);

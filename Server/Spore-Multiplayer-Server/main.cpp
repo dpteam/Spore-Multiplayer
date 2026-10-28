@@ -110,6 +110,7 @@ namespace
 			"  --tick-rate <hz>      State broadcast rate, 1-60 (default: 20)\n"
 			"  --timeout <seconds>   Drop a player after this time without data (default: 15)\n"
 			"  --log-level <level>   debug, info, warning or error (default: info)\n"
+			"  --log-file <path>     log file (default: SporeMultiplayer-Server.log next to the exe)\n"
 			"  --master <url>        register on a master server, e.g. http://host:17401\n"
 			"  --relay <host:port>   accept players through a relay (no port forwarding)\n"
 			"  --relay-ticket <hex>  fixed relay ticket (random by default)\n"
@@ -164,8 +165,14 @@ int main(int argc, char** argv)
 	SporeMP::ServerConfig config;
 	SporeMP::SetLogLevel(SporeMP::LogLevel::Info);
 
+	// The server is usually started hidden (by mp_host or the launcher), so its
+	// stdout goes nowhere: a log file next to the executable is the only way to
+	// see what happened. It is enabled before anything else is logged.
+	const std::string executableDirectory = GetExecutableDirectory();
+	SporeMP::SetLogFile(executableDirectory + "SporeMultiplayer-Server.log");
+
 	// 1) The ini file is read first, so the command line always wins.
-	std::string configPath = GetExecutableDirectory() + "server.ini";
+	std::string configPath = executableDirectory + "server.ini";
 	bool configSpecified = false;
 
 	for (int i = 1; i < argc; ++i)
@@ -262,6 +269,11 @@ int main(int argc, char** argv)
 			}
 			SporeMP::SetLogLevel(level);
 		}
+		else if (argument == "--log-file")
+		{
+			if (!nextValue("--log-file", value)) return 1;
+			SporeMP::SetLogFile(value);
+		}
 		else if (argument == "--allow-duplicate-names")
 		{
 			config.allowDuplicateNames = true;
@@ -312,6 +324,18 @@ int main(int argc, char** argv)
 
 	std::printf("%s server, protocol v%u\n", SporeMP::kProtocolName, SporeMP::kProtocolVersion);
 	std::printf("Type 'help' and press Enter to see the console commands.\n\n");
+
+	// Log the effective configuration: this is the first thing to look at when a
+	// player reports "it does not work".
+	MP_LOG_INFO("Effective configuration:");
+	MP_LOG_INFO("  port=%u bind=%s maxPlayers=%d tickRate=%d timeout=%d",
+		config.port, config.bindAddress.c_str(), config.maxPlayers,
+		config.tickRate, config.timeoutSeconds);
+	MP_LOG_INFO("  session='%s' master='%s' relay='%s'",
+		config.sessionName.c_str(),
+		config.masterUrl.empty() ? "(none)" : config.masterUrl.c_str(),
+		config.relayAddress.empty() ? "(none)" : config.relayAddress.c_str());
+	MP_LOG_INFO("  log file: %s", SporeMP::GetLogFile().empty() ? "(disabled)" : SporeMP::GetLogFile().c_str());
 
 	SporeMP::Server server(config);
 	if (!server.Start())

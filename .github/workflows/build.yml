@@ -96,62 +96,54 @@ jobs:
       - name: Collect artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "artifacts" | Out-Null
-          Copy-Item "kit\mLibs\Spore-Multiplayer-Client.dll" "artifacts\" -Force
-          Copy-Item "Client\Spore-Multiplayer-Client\SporeMultiplayer.ini" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Server\bin\Release\Spore-Multiplayer-Server.exe" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Server\server.ini" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Master\bin\Release\Spore-Multiplayer-Master.exe" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Master\master.ini" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Relay\bin\Release\Spore-Multiplayer-Relay.exe" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Relay\relay.ini" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Launcher\bin\Release\Spore-Multiplayer-Launcher.exe" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Launcher\bin\Release\WebView2Loader.dll" "artifacts\" -Force
-          Copy-Item "Server\Spore-Multiplayer-Launcher\launcher.ini" "artifacts\" -Force
-          Get-ChildItem "artifacts" | Select-Object Name, Length
+          # One bundle with everything, laid out the way a player expects it:
+          # each program in its own folder next to its configuration.
+          $root = "bundle\Spore-Multiplayer"
+          New-Item -ItemType Directory -Force -Path "$root\Client" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root\Launcher" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root\Server" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root\Master" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root\Relay" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root\Tools" | Out-Null
 
-      - name: Upload client mod
+          # Client mod (goes into the Launcher Kit mLibs folder)
+          Copy-Item "kit\mLibs\Spore-Multiplayer-Client.dll" "$root\Client\" -Force
+          Copy-Item "Client\Spore-Multiplayer-Client\SporeMultiplayer.ini" "$root\Client\" -Force
+
+          # Launcher
+          Copy-Item "Server\Spore-Multiplayer-Launcher\bin\Release\Spore-Multiplayer-Launcher.exe" "$root\Launcher\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Launcher\bin\Release\WebView2Loader.dll" "$root\Launcher\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Launcher\launcher.ini" "$root\Launcher\" -Force
+
+          # Dedicated server
+          Copy-Item "Server\Spore-Multiplayer-Server\bin\Release\Spore-Multiplayer-Server.exe" "$root\Server\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Server\server.ini" "$root\Server\" -Force
+
+          # Master and relay
+          Copy-Item "Server\Spore-Multiplayer-Master\bin\Release\Spore-Multiplayer-Master.exe" "$root\Master\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Master\master.ini" "$root\Master\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Relay\bin\Release\Spore-Multiplayer-Relay.exe" "$root\Relay\" -Force
+          Copy-Item "Server\Spore-Multiplayer-Relay\relay.ini" "$root\Relay\" -Force
+
+          # Helper scripts players need when reporting a problem
+          Copy-Item "Tools\collect-logs.ps1" "$root\Tools\" -Force
+          Copy-Item "Tools\fake-client.ps1" "$root\Tools\" -Force
+          Copy-Item "README.md" "$root\" -Force
+          Copy-Item "TESTING.md" "$root\" -Force
+
+          Get-ChildItem $root -Recurse -File | Select-Object FullName, Length
+
+      - name: Create the bundle archive
+        shell: pwsh
+        run: |
+          $version = "${{ github.sha }}".Substring(0, 7)
+          $name = "Spore-Multiplayer-$version"
+          Compress-Archive -Path "bundle\Spore-Multiplayer" -DestinationPath "$name.zip" -Force
+          Get-Item "$name.zip" | Select-Object Name, Length
+
+      - name: Upload bundle
         uses: actions/upload-artifact@v4
         with:
-          name: spore-multiplayer-client
-          path: |
-            artifacts/Spore-Multiplayer-Client.dll
-            artifacts/SporeMultiplayer.ini
-          if-no-files-found: error
-
-      - name: Upload dedicated server
-        uses: actions/upload-artifact@v4
-        with:
-          name: spore-multiplayer-server
-          path: |
-            artifacts/Spore-Multiplayer-Server.exe
-            artifacts/server.ini
-          if-no-files-found: error
-
-      - name: Upload master server
-        uses: actions/upload-artifact@v4
-        with:
-          name: spore-multiplayer-master
-          path: |
-            artifacts/Spore-Multiplayer-Master.exe
-            artifacts/master.ini
-          if-no-files-found: error
-
-      - name: Upload relay server
-        uses: actions/upload-artifact@v4
-        with:
-          name: spore-multiplayer-relay
-          path: |
-            artifacts/Spore-Multiplayer-Relay.exe
-            artifacts/relay.ini
-          if-no-files-found: error
-
-      - name: Upload launcher
-        uses: actions/upload-artifact@v4
-        with:
-          name: spore-multiplayer-launcher
-          path: |
-            artifacts/Spore-Multiplayer-Launcher.exe
-            artifacts/WebView2Loader.dll
-            artifacts/launcher.ini
+          name: Spore-Multiplayer
+          path: Spore-Multiplayer-*.zip
           if-no-files-found: error

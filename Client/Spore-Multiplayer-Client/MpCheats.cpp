@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "MpCheats.h"
 #include "MpAssets.h"
+#include "MpAssets.h"
 #include "MpAvatars.h"
 #include "MpConfig.h"
 #include "MpConsole.h"
@@ -91,6 +92,7 @@ namespace SporeMP
 			Print("  mp_tags [on|off]         - show or hide the names above the avatars");
 			Print("  mp_reload                - reload SporeMultiplayer.ini");
 			Print("  mp_help                  - this list");
+			Print("  mp_diag                  - write a diagnostic report to the log");
 		}
 
 		// --------------------------------------------------------------------
@@ -432,6 +434,61 @@ namespace SporeMP
 			}
 		};
 
+		/// Dumps the full state to the log, for bug reports.
+		class DiagCheat : public ArgScript::ICommand
+		{
+		public:
+			void ParseLine(const ArgScript::Line& line) override
+			{
+				Session& session = Session::Get();
+
+				MP_LOG_INFO("========== DIAGNOSTIC REPORT ==========");
+
+				MP_LOG_INFO("Status: %s  stage=%s  system=%08x",
+					session.GetStatusText().c_str(),
+					StageName(session.GetLocalStage()),
+					session.GetLocalSystemId());
+
+				MP_LOG_INFO("Local: id=%u name='%s' latency=%d ms",
+					session.GetLocalId(), session.GetLocalName().c_str(), session.GetLatency());
+
+				MP_LOG_INFO("Session: '%s'  players=%zu",
+					session.GetSessionName().c_str(), session.GetPlayers().size());
+
+				for (const RemotePlayer& player : session.GetPlayers())
+				{
+					MP_LOG_INFO("  player %u '%s' stage=%s system=%08x state=%s pos=(%.1f, %.1f, %.1f)",
+						player.id, player.name.c_str(), StageName(player.stage),
+						player.systemId, player.hasState ? "yes" : "no",
+						player.position.x, player.position.y, player.position.z);
+				}
+
+				const auto& discovered = Discovery::Get().GetSessions();
+				MP_LOG_INFO("LAN sessions: %zu", discovered.size());
+				for (const DiscoveredSession& entry : discovered)
+				{
+					MP_LOG_INFO("  '%s' %s:%u %d/%d",
+						entry.name.c_str(), entry.address.c_str(), entry.port,
+						entry.players, entry.maxPlayers);
+				}
+
+				MP_LOG_INFO("Avatars spawned: %d", Avatars::Get().GetActiveCount());
+				MP_LOG_INFO("Imported creations: %d", AvatarAssets::Get().GetImportedCount());
+				MP_LOG_INFO("Hosting server: %s", Host::Get().IsHosting() ? "yes" : "no");
+				MP_LOG_INFO("Menu visible: %s", Menu::Get().IsVisible() ? "yes" : "no");
+
+				MP_LOG_INFO("========== END DIAGNOSTIC ==========");
+
+				Print("Diagnostic report written to " + GetLogPath());
+				Print("Send that file to the developer");
+			}
+
+			const char* GetDescription(ArgScript::DescriptionMode mode) const override
+			{
+				return "Writes a full diagnostic report to the log file.";
+			}
+		};
+
 		class DisconnectCheat : public ArgScript::ICommand		{
 		public:
 			void ParseLine(const ArgScript::Line& line) override
@@ -689,6 +746,7 @@ namespace SporeMP
 		manager->AddCheat("mp_connect", new ConnectCheat());
 		manager->AddCheat("mp_host", new HostCheat());
 		manager->AddCheat("mp_menu", new MenuCheat());
+		manager->AddCheat("mp_diag", new DiagCheat());
 		manager->AddCheat("mp_servers", new ServersCheat());
 		manager->AddCheat("mp_internet", new InternetCheat());
 		manager->AddCheat("mp_join", new JoinCheat());

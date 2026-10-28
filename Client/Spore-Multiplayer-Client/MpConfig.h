@@ -56,6 +56,10 @@ namespace SporeMP
 		/// Open the separate console window with the log and the commands.
 		bool console = true;
 
+		/// Log verbosity: "debug", "info", "warning" or "error".
+		/// Set "debug" when collecting logs for a bug report.
+		std::string logLevel = "info";
+
 		int sendRate = 15;
 		bool showAvatars = true;
 		bool interpolation = true;

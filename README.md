@@ -58,6 +58,9 @@ Tools/fake-client.ps1              A fake client that joins and flies around
 Tools/download-test-creations.py   Fetches real creations from the Sporepedia
 Tools/send-console-command.ps1     Sends a command to the mod console
 Tools/make-icon.ps1                Regenerates refs/ICON.ico from refs/ICON.png
+Tools/collect-logs.ps1             Collects everything needed for a bug report
+Tools/real-click.ps1               Clicks inside Spore (testing helper)
+TESTING.md                         Step-by-step checklist for testing with friends
 refs/                              Icon and other reference assets
 Spore-ModAPI/                      Submodule with the SDK
 ```
@@ -67,7 +70,6 @@ Spore-ModAPI/                      Submodule with the SDK
 ## Building
 
 ### Requirements
-
 - **Visual Studio 2022 or newer** with *Desktop development with C++* (x86 toolset).
 - The **Spore ModAPI Launcher Kit** installed in `C:\ProgramData\SPORE ModAPI Launcher Kit`
   (the client DLL is copied to its `mLibs` folder, which is where the launcher reads mods from).
@@ -110,6 +112,21 @@ powershell -ExecutionPolicy Bypass -File Tools\test-server.ps1
 The script starts the server on a random port, connects several fake clients and checks the
 handshake, the player list, the state relay, the chat, the ping, the protocol mismatch rejection
 and the disconnect notifications. It needs no game installation.
+
+There are also `test-discovery.ps1`, `test-master.ps1`, `test-relay.ps1` and
+`test-relay-host.ps1`; all of them run in CI.
+
+### Testing with friends
+
+See **[TESTING.md](TESTING.md)** for a step-by-step checklist: what to test, what should
+happen, and how to collect logs when something goes wrong.
+
+```
+powershell -ExecutionPolicy Bypass -File Tools\collect-logs.ps1
+```
+
+That produces one zip with the mod log, the configuration, the server log, Spore's crash
+reports and the system information — everything needed to diagnose a report.
 
 ### Testing with two game instances on one computer
 

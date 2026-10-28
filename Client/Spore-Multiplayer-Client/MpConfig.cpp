@@ -99,6 +99,7 @@ namespace SporeMP
 			else if (key == "relay" || key == "relay_url") config.relayUrl = value;
 			else if (key == "hud") config.hud = ToBool(value);
 			else if (key == "console") config.console = ToBool(value);
+			else if (key == "log_level") config.logLevel = ToLower(value);
 			else if (key == "hud_x" && ToFloat(value, decimal)) config.hudX = decimal;
 			else if (key == "hud_y" && ToFloat(value, decimal)) config.hudY = decimal;
 			else if (key == "hud_scale" && ToFloat(value, decimal) && decimal > 0.1f && decimal < 4.0f) config.hudScale = decimal;
@@ -141,6 +142,9 @@ namespace SporeMP
 			"hud=" << (config.hud ? 1 : 0) << "\n"
 			"; Open a separate console window with the log and the commands.\n"
 			"console=" << (config.console ? 1 : 0) << "\n"
+			"; Log verbosity: debug, info, warning or error.\n"
+			"; Set debug when collecting logs for a bug report.\n"
+			"log_level=" << config.logLevel << "\n"
 			"hud_x=" << config.hudX << "\n"
 			"hud_y=" << config.hudY << "\n"
 			"hud_scale=" << config.hudScale << "\n"
